@@ -1,3 +1,12 @@
 <Solution>
-  <Project Path="Mazaad.API/Mazaad.API.csproj" />
+  <Folder Name="/Core/">
+    <Project Path="Mazaad.Application/Mazaad.Application.csproj" />
+    <Project Path="Mazaad.Domain/Mazaad.Domain.csproj" />
+  </Folder>
+  <Folder Name="/Infrastructure/">
+    <Project Path="Mazaad.Infrastructure/Mazaad.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/Presentation/">
+    <Project Path="Mazaad.API/Mazaad.API.csproj" />
+  </Folder>
 </Solution>
