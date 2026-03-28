@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
+////kl;
+
 namespace Mazaad.Infrastructure.Migrations
 {
     /// <inheritdoc />

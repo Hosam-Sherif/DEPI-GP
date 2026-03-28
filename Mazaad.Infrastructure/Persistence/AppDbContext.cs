@@ -59,7 +59,7 @@ namespace Mazaad.Infrastructure.Persistence
                 .WithMany(c => c.Bids)
                 .HasForeignKey(b => b.buyer_company_id)
                 .OnDelete(DeleteBehavior.NoAction);
-                foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
+            foreach (var relationship in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
             {
                 relationship.DeleteBehavior = DeleteBehavior.NoAction;
             }
