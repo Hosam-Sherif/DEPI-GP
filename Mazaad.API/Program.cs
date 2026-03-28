@@ -1,4 +1,8 @@
 
+using Microsoft.EntityFrameworkCore;
+using System;
+using Mazaad.Infrastructure.Persistence;
+
 namespace Mazaad.API
 {
     public class Program
@@ -13,6 +17,11 @@ namespace Mazaad.API
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
+
+            var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+            
+            builder.Services.AddDbContext<AppDbContext>(option =>
+            option.UseSqlServer(connectionString));
 
             var app = builder.Build();
 
