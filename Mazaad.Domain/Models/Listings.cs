@@ -1,29 +1,33 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Mazaad.Domain.Models
 {
     public class Listings
     {
-        public int ID { get; set; }
+        [Key]
+        public int Id { get; set; }
 
         [ForeignKey("Company")]
-        public int company_id { get; set; }
+        public int CompanyId { get; set; }
 
         [ForeignKey("Category")]
-        public int category_id { get; set; }
+        public int CategoryId { get; set; }
 
-        public string title { get; set; }
-        public string description { get; set; }
-        public decimal min_order_quantity { get; set; }
-        public decimal available_quantity { get; set; }
-        public decimal purity_percentage { get; set; }
-        public DateTime start_date { get; set; }
-        public DateTime end_date { get; set; }
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public decimal MinOrderQuantity { get; set; }
+        public decimal AvailableQuantity { get; set; }
+        public decimal PurityPercentage { get; set; }
+        public string BaseCurrency { get; set; }
+        public decimal CurrentHighestBid { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime EndDate { get; set; }
+        public bool IsDeleted { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
 
         public Companies Company { get; set; }
         public Material_Categories Category { get; set; }

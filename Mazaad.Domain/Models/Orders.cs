@@ -1,30 +1,31 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Mazaad.Domain.Models
 {
     public class Orders
     {
+        [Key]
         public int Id { get; set; }
 
         [ForeignKey("SellerCompany")]
-        public int seller_company_id { get; set; }
+        public int SellerCompanyId { get; set; }
 
         [ForeignKey("BuyerCompany")]
-        public int buyer_company_id { get; set; }
+        public int BuyerCompanyId { get; set; }
 
         [ForeignKey("Bid")]
-        public int bid_id { get; set; }
+        public int BidId { get; set; }
+
         [ForeignKey("AppliedPolicy")]
-        public int applied_policy_id { get; set; }
-        public decimal agreed_quantity { get; set; }
-        public decimal agreed_unit_price { get; set; }
-        public decimal platform_fee { get; set; }
-        public DateTime order_date { get; set; }
+        public int AppliedPolicyId { get; set; }
+
+        public decimal AgreedQuantity { get; set; }
+        public decimal AgreedUnitPrice { get; set; }
+        public decimal PlatformFee { get; set; }
+        public DateTime OrderDate { get; set; }
 
         public Companies SellerCompany { get; set; }
         public Companies BuyerCompany { get; set; }

@@ -1,28 +1,22 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace Mazaad.Domain.Models
 {
     public class Notifications
     {
+        [Key]
         public int Id { get; set; }
 
-        [ForeignKey("User")]
-        public int user_id { get; set; }
+        public int UserId { get; set; }
+        public string Title { get; set; }
+        public string Message { get; set; }
+        public bool IsRead { get; set; }
+        public string ReferenceType { get; set; }
+        public int ReferenceId { get; set; }
+        public DateTime CreatedAt { get; set; }
 
-        public string title { get; set; }
-        public string message { get; set; }
-
-        public bool is_read { get; set; }
-
-        public string reference_type { get; set; }
-        public int reference_id { get; set; }
-
-        public DateTime created_at { get; set; }
         public App_Users User { get; set; }
     }
 }

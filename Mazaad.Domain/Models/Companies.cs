@@ -1,25 +1,26 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Mazaad.Domain.Models
 {
     public class Companies
     {
+        [Key]
         public int Id { get; set; }
+
         [ForeignKey("Industry")]
-        public int industry_id { get; set; }
-        public string company_name { get; set; }
-        public string commercial_reg_num { get; set; }
-        public string tax_registration_num { get; set; }
-        public string city { get; set; }
-        public string address_details { get; set; }
-        public bool is_verified { get; set; }
-        public DateTime created_at { get; set; }
-        public DateTime updated_at { get; set; }
+        public int IndustryId { get; set; }
+
+        public string CompanyName { get; set; }
+        public string CommercialRegNum { get; set; }
+        public string TaxRegistrationNum { get; set; }
+        public string City { get; set; }
+        public string AddressDetails { get; set; }
+        public bool IsVerified { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
 
         public IndustryType Industry { get; set; }
         public ICollection<App_Users> Users { get; set; } = new HashSet<App_Users>();

@@ -1,27 +1,26 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Mazaad.Domain.Models
 {
     public class Chat_Channels
     {
+        [Key]
         public int Id { get; set; }
 
         [ForeignKey("Listing")]
-        public int listing_id { get; set; }
+        public int ListingId { get; set; }
 
         [ForeignKey("SellerCompany")]
-        public int seller_company_id { get; set; }
+        public int SellerCompanyId { get; set; }
 
         [ForeignKey("BuyerCompany")]
-        public int buyer_company_id { get; set; }
+        public int BuyerCompanyId { get; set; }
 
-        public string status { get; set; }
-        public DateTime created_at { get; set; }
+        public string Status { get; set; }
+        public DateTime CreatedAt { get; set; }
 
         public Listings Listing { get; set; }
         public Companies SellerCompany { get; set; }

@@ -1,7 +1,8 @@
-
 using Microsoft.EntityFrameworkCore;
-using System;
 using Mazaad.Infrastructure.Persistence;
+using Mazaad.Application.Interfaces;
+using Mazaad.Application.Services;
+using Mazaad.API.Hubs;
 
 namespace Mazaad.API
 {
@@ -12,17 +13,23 @@ namespace Mazaad.API
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-
-            
             builder.Services.AddControllers();
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
+            // SignalR for real-time chat
+            builder.Services.AddSignalR();
+
+            // Database
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-            
-            builder.Services.AddDbContext<AppDbContext>(option =>
-            option.UseSqlServer(connectionString));
+            builder.Services.AddDbContext<AppDbContext>(options =>
+                options.UseSqlServer(connectionString));
+
+            // Register Application Services (DI)
+            builder.Services.AddScoped<IBiddingService, BiddingService>();
+            builder.Services.AddScoped<IListingService, ListingService>();
+            builder.Services.AddScoped<IMaterialCategoryService, MaterialCategoryService>();
+            builder.Services.AddScoped<IChatService, ChatService>();
 
             var app = builder.Build();
 
@@ -34,11 +41,10 @@ namespace Mazaad.API
             }
 
             app.UseHttpsRedirection();
-
             app.UseAuthorization();
 
-
             app.MapControllers();
+            app.MapHub<ChatHub>("/hubs/chat");
 
             app.Run();
         }

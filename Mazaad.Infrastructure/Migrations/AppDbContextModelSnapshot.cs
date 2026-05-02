@@ -30,39 +30,39 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("company_id")
+                    b.Property<int>("CompanyId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("created_at")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("email")
+                    b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("full_name")
+                    b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<bool>("is_active")
+                    b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
-                    b.Property<string>("job_title")
+                    b.Property<string>("JobTitle")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("last_login_date")
+                    b.Property<DateTime>("LastLoginDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("password_hash")
+                    b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("company_id");
+                    b.HasIndex("CompanyId");
 
-                    b.ToTable("App_Users");
+                    b.ToTable("AppUsers");
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Bids", b =>
@@ -73,31 +73,40 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("bid_amount_per_unit")
+                    b.Property<decimal>("BidAmountPerUnit")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("buyer_company_id")
+                    b.Property<int>("BuyerCompanyId")
                         .HasColumnType("int");
 
-                    b.Property<int>("listing_id")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsAnonymous")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ListingId")
                         .HasColumnType("int");
 
-                    b.Property<int>("placed_by_user_id")
+                    b.Property<int>("PlacedByUserId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("total_bid_amount")
+                    b.Property<decimal>("Quantity")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<bool>("winning_bid")
+                    b.Property<decimal>("TotalBidAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("WinningBid")
                         .HasColumnType("bit");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("buyer_company_id");
+                    b.HasIndex("BuyerCompanyId");
 
-                    b.HasIndex("listing_id");
+                    b.HasIndex("ListingId");
 
-                    b.HasIndex("placed_by_user_id");
+                    b.HasIndex("PlacedByUserId");
 
                     b.ToTable("Bids");
                 });
@@ -110,31 +119,31 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("buyer_company_id")
+                    b.Property<int>("BuyerCompanyId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("created_at")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("listing_id")
+                    b.Property<int>("ListingId")
                         .HasColumnType("int");
 
-                    b.Property<int>("seller_company_id")
+                    b.Property<int>("SellerCompanyId")
                         .HasColumnType("int");
 
-                    b.Property<string>("status")
+                    b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("buyer_company_id");
+                    b.HasIndex("BuyerCompanyId");
 
-                    b.HasIndex("listing_id");
+                    b.HasIndex("ListingId");
 
-                    b.HasIndex("seller_company_id");
+                    b.HasIndex("SellerCompanyId");
 
-                    b.ToTable("Chat_Channels");
+                    b.ToTable("ChatChannels");
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Commission_Policies", b =>
@@ -169,7 +178,7 @@ namespace Mazaad.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Commission_Policies");
+                    b.ToTable("CommissionPolicies");
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Companies", b =>
@@ -180,41 +189,41 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("address_details")
+                    b.Property<string>("AddressDetails")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("city")
+                    b.Property<string>("City")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("commercial_reg_num")
+                    b.Property<string>("CommercialRegNum")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("company_name")
+                    b.Property<string>("CompanyName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("created_at")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("industry_id")
+                    b.Property<int>("IndustryId")
                         .HasColumnType("int");
 
-                    b.Property<bool>("is_verified")
+                    b.Property<bool>("IsVerified")
                         .HasColumnType("bit");
 
-                    b.Property<string>("tax_registration_num")
+                    b.Property<string>("TaxRegistrationNum")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("updated_at")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("industry_id");
+                    b.HasIndex("IndustryId");
 
                     b.ToTable("Companies");
                 });
@@ -247,46 +256,62 @@ namespace Mazaad.Infrastructure.Migrations
 
             modelBuilder.Entity("Mazaad.Domain.Models.Listings", b =>
                 {
-                    b.Property<int>("ID")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ID"));
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("available_quantity")
+                    b.Property<decimal>("AvailableQuantity")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("category_id")
-                        .HasColumnType("int");
-
-                    b.Property<int>("company_id")
-                        .HasColumnType("int");
-
-                    b.Property<string>("description")
+                    b.Property<string>("BaseCurrency")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("end_date")
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<decimal>("min_order_quantity")
+                    b.Property<decimal>("CurrentHighestBid")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<decimal>("purity_percentage")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("start_date")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("title")
+                    b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("ID");
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime2");
 
-                    b.HasIndex("category_id");
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
 
-                    b.HasIndex("company_id");
+                    b.Property<decimal>("MinOrderQuantity")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("PurityPercentage")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("CompanyId");
 
                     b.ToTable("Listings");
                 });
@@ -299,24 +324,24 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("category_name")
+                    b.Property<string>("CategoryName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("created_at")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("description")
+                    b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("unit_of_measure")
+                    b.Property<string>("UnitOfMeasure")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("Material_Categories");
+                    b.ToTable("MaterialCategories");
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Messages", b =>
@@ -327,24 +352,24 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("channel_id")
+                    b.Property<int>("ChannelId")
                         .HasColumnType("int");
 
-                    b.Property<string>("message_text")
+                    b.Property<string>("MessageText")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("sender_user_id")
+                    b.Property<int>("SenderUserId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("sent_at")
+                    b.Property<DateTime>("SentAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("channel_id");
+                    b.HasIndex("ChannelId");
 
-                    b.HasIndex("sender_user_id");
+                    b.HasIndex("SenderUserId");
 
                     b.ToTable("Messages");
                 });
@@ -357,33 +382,33 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<DateTime>("created_at")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<bool>("is_read")
+                    b.Property<bool>("IsRead")
                         .HasColumnType("bit");
 
-                    b.Property<string>("message")
+                    b.Property<string>("Message")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("reference_id")
+                    b.Property<int>("ReferenceId")
                         .HasColumnType("int");
 
-                    b.Property<string>("reference_type")
+                    b.Property<string>("ReferenceType")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("title")
+                    b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("user_id")
+                    b.Property<int>("UserId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("user_id");
+                    b.HasIndex("UserId");
 
                     b.ToTable("Notifications");
                 });
@@ -396,39 +421,39 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("agreed_quantity")
+                    b.Property<decimal>("AgreedQuantity")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<decimal>("agreed_unit_price")
+                    b.Property<decimal>("AgreedUnitPrice")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("applied_policy_id")
+                    b.Property<int>("AppliedPolicyId")
                         .HasColumnType("int");
 
-                    b.Property<int>("bid_id")
+                    b.Property<int>("BidId")
                         .HasColumnType("int");
 
-                    b.Property<int>("buyer_company_id")
+                    b.Property<int>("BuyerCompanyId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("order_date")
+                    b.Property<DateTime>("OrderDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<decimal>("platform_fee")
+                    b.Property<decimal>("PlatformFee")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("seller_company_id")
+                    b.Property<int>("SellerCompanyId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("applied_policy_id");
+                    b.HasIndex("AppliedPolicyId");
 
-                    b.HasIndex("bid_id");
+                    b.HasIndex("BidId");
 
-                    b.HasIndex("buyer_company_id");
+                    b.HasIndex("BuyerCompanyId");
 
-                    b.HasIndex("seller_company_id");
+                    b.HasIndex("SellerCompanyId");
 
                     b.ToTable("Orders");
                 });
@@ -441,33 +466,33 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<decimal>("amount")
+                    b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<DateTime>("created_at")
+                    b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("order_id")
+                    b.Property<int>("OrderId")
                         .HasColumnType("int");
 
-                    b.Property<DateTime>("paid_at")
+                    b.Property<DateTime>("PaidAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("payment_method")
+                    b.Property<string>("PaymentMethod")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("status")
+                    b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("transaction_reference")
+                    b.Property<string>("TransactionReference")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("order_id");
+                    b.HasIndex("OrderId");
 
                     b.ToTable("Payments");
                 });
@@ -476,7 +501,7 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.Companies", "Company")
                         .WithMany("Users")
-                        .HasForeignKey("company_id")
+                        .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -487,19 +512,19 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.Companies", "BuyerCompany")
                         .WithMany("Bids")
-                        .HasForeignKey("buyer_company_id")
+                        .HasForeignKey("BuyerCompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.Listings", "Listing")
                         .WithMany("Bids")
-                        .HasForeignKey("listing_id")
+                        .HasForeignKey("ListingId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.App_Users", "User")
                         .WithMany("Bids")
-                        .HasForeignKey("placed_by_user_id")
+                        .HasForeignKey("PlacedByUserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -514,19 +539,19 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.Companies", "BuyerCompany")
                         .WithMany("BuyerChatChannels")
-                        .HasForeignKey("buyer_company_id")
+                        .HasForeignKey("BuyerCompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.Listings", "Listing")
                         .WithMany("Chat_Channels")
-                        .HasForeignKey("listing_id")
+                        .HasForeignKey("ListingId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.Companies", "SellerCompany")
                         .WithMany("SellerChatChannels")
-                        .HasForeignKey("seller_company_id")
+                        .HasForeignKey("SellerCompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -541,7 +566,7 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.IndustryType", "Industry")
                         .WithMany("Companies")
-                        .HasForeignKey("industry_id")
+                        .HasForeignKey("IndustryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -552,13 +577,13 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.Material_Categories", "Category")
                         .WithMany("Listings")
-                        .HasForeignKey("category_id")
+                        .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.Companies", "Company")
                         .WithMany("Listings")
-                        .HasForeignKey("company_id")
+                        .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -571,13 +596,13 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.Chat_Channels", "Channel")
                         .WithMany("Messages")
-                        .HasForeignKey("channel_id")
+                        .HasForeignKey("ChannelId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.App_Users", "SenderUser")
                         .WithMany("Messages")
-                        .HasForeignKey("sender_user_id")
+                        .HasForeignKey("SenderUserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -590,7 +615,7 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.App_Users", "User")
                         .WithMany("Notifications")
-                        .HasForeignKey("user_id")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -601,25 +626,25 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.Commission_Policies", "AppliedPolicy")
                         .WithMany("AppliedOrders")
-                        .HasForeignKey("applied_policy_id")
+                        .HasForeignKey("AppliedPolicyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.Bids", "Bid")
                         .WithMany("Orders")
-                        .HasForeignKey("bid_id")
+                        .HasForeignKey("BidId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.Companies", "BuyerCompany")
                         .WithMany("PurchaseOrders")
-                        .HasForeignKey("buyer_company_id")
+                        .HasForeignKey("BuyerCompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.HasOne("Mazaad.Domain.Models.Companies", "SellerCompany")
                         .WithMany("SalesOrders")
-                        .HasForeignKey("seller_company_id")
+                        .HasForeignKey("SellerCompanyId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -636,7 +661,7 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.HasOne("Mazaad.Domain.Models.Orders", "Order")
                         .WithMany("Payments")
-                        .HasForeignKey("order_id")
+                        .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 

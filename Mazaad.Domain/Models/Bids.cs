@@ -1,28 +1,30 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Mazaad.Domain.Models
 {
     public class Bids
     {
+        [Key]
         public int Id { get; set; }
 
         [ForeignKey("Listing")]
-        public int listing_id { get; set; }
+        public int ListingId { get; set; }
 
         [ForeignKey("User")]
-        public int placed_by_user_id { get; set; }
+        public int PlacedByUserId { get; set; }
 
         [ForeignKey("BuyerCompany")]
-        public int buyer_company_id { get; set; }
+        public int BuyerCompanyId { get; set; }
 
-        public decimal bid_amount_per_unit { get; set; }
-        public decimal total_bid_amount { get; set; }
-        public bool winning_bid { get; set; }
+        public decimal BidAmountPerUnit { get; set; }
+        public decimal TotalBidAmount { get; set; }
+        public decimal Quantity { get; set; }
+        public bool IsAnonymous { get; set; }
+        public bool WinningBid { get; set; }
+        public DateTime CreatedAt { get; set; }
 
         public Listings Listing { get; set; }
         public App_Users User { get; set; }
