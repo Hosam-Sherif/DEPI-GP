@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Mazaad.Domain.Enums;
 
 namespace Mazaad.Domain.Models
 {
@@ -25,12 +26,21 @@ namespace Mazaad.Domain.Models
         public decimal AgreedQuantity { get; set; }
         public decimal AgreedUnitPrice { get; set; }
         public decimal PlatformFee { get; set; }
-        public DateTime OrderDate { get; set; }
+        public decimal TotalAmount { get; set; }
 
-        public Companies SellerCompany { get; set; }
-        public Companies BuyerCompany { get; set; }
-        public Bids Bid { get; set; }
-        public Commission_Policies AppliedPolicy { get; set; }
+        public OrderStatus Status { get; set; } = OrderStatus.Pending;
+
+        [MaxLength(500)]
+        public string Notes { get; set; } = string.Empty;
+
+        public DateTime OrderDate { get; set; }
+        public DateTime UpdatedAt { get; set; }
+
+        // Navigation
+        public Companies SellerCompany { get; set; } = null!;
+        public Companies BuyerCompany { get; set; } = null!;
+        public Bids Bid { get; set; } = null!;
+        public Commission_Policies AppliedPolicy { get; set; } = null!;
         public ICollection<Payments> Payments { get; set; } = new HashSet<Payments>();
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Mazaad.Domain.Enums;
 
 namespace Mazaad.Domain.Models
 {
@@ -23,12 +24,19 @@ namespace Mazaad.Domain.Models
         public decimal TotalBidAmount { get; set; }
         public decimal Quantity { get; set; }
         public bool IsAnonymous { get; set; }
-        public bool WinningBid { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public Listings Listing { get; set; }
-        public App_Users User { get; set; }
-        public Companies BuyerCompany { get; set; }
 
+        /// <summary>Marks the auction-winner bid; set during finalization</summary>
+        public bool WinningBid { get; set; }
+
+        /// <summary>Lifecycle status of this individual bid</summary>
+        public BidStatus Status { get; set; } = BidStatus.Active;
+
+        public DateTime CreatedAt { get; set; }
+
+        // Navigation
+        public Listings Listing { get; set; } = null!;
+        public App_Users User { get; set; } = null!;
+        public Companies BuyerCompany { get; set; } = null!;
         public ICollection<Orders> Orders { get; set; } = new HashSet<Orders>();
     }
 }
