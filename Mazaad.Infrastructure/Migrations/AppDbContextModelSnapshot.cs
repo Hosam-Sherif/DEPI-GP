@@ -131,9 +131,8 @@ namespace Mazaad.Infrastructure.Migrations
                     b.Property<int>("SellerCompanyId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 

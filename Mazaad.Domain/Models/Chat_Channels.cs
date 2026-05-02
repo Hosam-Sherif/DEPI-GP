@@ -1,3 +1,4 @@
+using Mazaad.Domain.Enums;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
@@ -18,8 +19,7 @@ namespace Mazaad.Domain.Models
 
         [ForeignKey("BuyerCompany")]
         public int BuyerCompanyId { get; set; }
-
-        public string Status { get; set; }
+        public ChannelStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
 
         public Listings Listing { get; set; }

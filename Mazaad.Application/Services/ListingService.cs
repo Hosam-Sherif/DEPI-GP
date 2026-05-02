@@ -23,23 +23,24 @@ namespace Mazaad.Application.Services
         {
             var listings = await _context.Listings
                 .Where(l => !l.IsDeleted)
+                .Select(l => new ListingResponseDto
+                {
+                    Id = l.Id,
+                    CompanyId = l.CompanyId,
+                    CategoryId = l.CategoryId,
+                    Title = l.Title,
+                    Description = l.Description,
+                    MinOrderQuantity = l.MinOrderQuantity,
+                    AvailableQuantity = l.AvailableQuantity,
+                    PurityPercentage = l.PurityPercentage,
+                    BaseCurrency = l.BaseCurrency,
+                    StartDate = l.StartDate,
+                    EndDate = l.EndDate,
+                    CurrentHighestBid = l.CurrentHighestBid
+                })
                 .ToListAsync();
 
-            return listings.Select(l => new ListingResponseDto
-            {
-                Id = l.Id,
-                CompanyId = l.CompanyId,
-                CategoryId = l.CategoryId,
-                Title = l.Title,
-                Description = l.Description,
-                MinOrderQuantity = l.MinOrderQuantity,
-                AvailableQuantity = l.AvailableQuantity,
-                PurityPercentage = l.PurityPercentage,
-                BaseCurrency = l.BaseCurrency,
-                StartDate = l.StartDate,
-                EndDate = l.EndDate,
-                CurrentHighestBid = l.CurrentHighestBid
-            });
+            return listings;
         }
 
         public async Task<ListingResponseDto?> GetListingByIdAsync(int id)

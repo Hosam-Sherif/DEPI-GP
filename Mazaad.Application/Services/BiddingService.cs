@@ -35,15 +35,15 @@ namespace Mazaad.Application.Services
             if (request.Quantity > listing.AvailableQuantity)
                 return new BidResultDto { Success = false, Message = $"Only {listing.AvailableQuantity} units are available." };
 
-            // Security Check: Never trust the frontend — calculate the total yourself
+            // calculate the total
             decimal expectedTotal = request.BidAmountPerUnit * request.Quantity;
-            if (request.TotalBidAmount != expectedTotal)
+            if (request.BidAmountPerUnit != expectedTotal)
                 return new BidResultDto { Success = false, Message = "Data mismatch. The total amount does not match the quantity * unit price." };
 
-            if (request.TotalBidAmount <= listing.CurrentHighestBid)
+            if (request.BidAmountPerUnit <= listing.CurrentHighestBid)
                 return new BidResultDto { Success = false, Message = "The bid amount must be higher than the current price." };
 
-            listing.CurrentHighestBid = request.TotalBidAmount;
+            listing.CurrentHighestBid = request.BidAmountPerUnit;
 
             var bid = new Bids
             {
@@ -51,7 +51,7 @@ namespace Mazaad.Application.Services
                 BuyerCompanyId = companyId,
                 PlacedByUserId = userId,
                 BidAmountPerUnit = request.BidAmountPerUnit,
-                TotalBidAmount = request.TotalBidAmount,
+                TotalBidAmount = request.BidAmountPerUnit,
                 Quantity = request.Quantity,
                 IsAnonymous = request.IsAnonymous,
                 CreatedAt = DateTime.UtcNow
@@ -62,15 +62,15 @@ namespace Mazaad.Application.Services
             try
             {
                 await _context.SaveChangesAsync();
-
-                string displayBider = request.IsAnonymous ? "Anonymous" : $"Company {companyId}";
+                Companies company = await _context.Companies.FindAsync(companyId);
+                string displayBider = request.IsAnonymous ? "Anonymous" : $"Company {company.CompanyName}";
 
                 return new BidResultDto
                 {
                     Success = true,
                     Message = "Bid placed successfully",
                     DisplayBiddersName = displayBider,
-                    NewPrice = request.TotalBidAmount
+                    NewPrice = request.BidAmountPerUnit
                 };
             }
             catch (DbUpdateConcurrencyException)
@@ -85,17 +85,17 @@ namespace Mazaad.Application.Services
 
         public async Task<IEnumerable<BidResultDto>> GetBidsForListingAsync(int listingId)
         {
-            var bids = await _context.Bids
+            var bids = await _context.Bids.Include(b => b.BuyerCompany)
                 .Where(b => b.ListingId == listingId)
-                .OrderByDescending(b => b.TotalBidAmount)
+                .OrderByDescending(b => b.BidAmountPerUnit)
                 .ToListAsync();
 
             return bids.Select(b => new BidResultDto
             {
                 Success = true,
                 Message = "Bid retrieved",
-                DisplayBiddersName = b.IsAnonymous ? "Anonymous" : $"Company {b.BuyerCompanyId}",
-                NewPrice = b.TotalBidAmount
+                DisplayBiddersName = b.IsAnonymous ? "Anonymous" : $"Company {b.BuyerCompany.CompanyName}",
+                NewPrice = b.BidAmountPerUnit
             });
         }
 

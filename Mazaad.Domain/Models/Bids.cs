@@ -25,7 +25,6 @@ namespace Mazaad.Domain.Models
         public bool IsAnonymous { get; set; }
         public bool WinningBid { get; set; }
         public DateTime CreatedAt { get; set; }
-
         public Listings Listing { get; set; }
         public App_Users User { get; set; }
         public Companies BuyerCompany { get; set; }

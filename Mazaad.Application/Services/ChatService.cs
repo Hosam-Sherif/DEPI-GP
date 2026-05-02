@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces;
 using Mazaad.Domain.Models;
+using Mazaad.Domain.Enums;
 using Mazaad.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,7 +33,7 @@ namespace Mazaad.Application.Services
                 ListingId = listingId,
                 BuyerCompanyId = buyerCompanyId,
                 SellerCompanyId = sellerCompanyId,
-                Status = "Open",
+                Status = ChannelStatus.Open,
                 CreatedAt = DateTime.UtcNow
             };
 
