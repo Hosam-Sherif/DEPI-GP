@@ -1,4 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using Mazaad.Infrastructure.Persistence;
 using Mazaad.Application.Interfaces;
 using Mazaad.Application.Services;
@@ -61,6 +64,37 @@ namespace Mazaad.API
             builder.Services.AddScoped<IChatService, ChatService>();
             builder.Services.AddScoped<ICompanyService, CompanyService>();
             builder.Services.AddScoped<IIndustryService, IndustryService>();
+            builder.Services.AddScoped<IBiddingService, BiddingService>();
+
+            builder.Services.AddScoped<IBiddingRepository, BiddingRepository>();
+            builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
+            builder.Services.AddScoped<ISalesRepository, SalesRepository>();
+
+            builder.Services.AddScoped<IBiddingService, BiddingService>();
+            builder.Services.AddScoped<IInventoryService, InventoryService>();
+            builder.Services.AddScoped<ISalesOperationsService, SalesOperationsService>();
+
+            builder.Services.AddAuthentication(
+                JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters =
+                        new TokenValidationParameters
+                        {
+                            ValidateIssuer = true,
+                            ValidateAudience = true,
+                            ValidateLifetime = true,
+                            ValidateIssuerSigningKey = true,
+
+                            ValidIssuer = builder.Configuration["JWT:Issuer"],
+                            ValidAudience = builder.Configuration["JWT:Audience"],
+
+                            IssuerSigningKey =
+                                new SymmetricSecurityKey(
+                                    Encoding.UTF8.GetBytes(
+                                        builder.Configuration["JWT:Key"]))
+                        };
+                });
 
             var app = builder.Build();
 
@@ -75,8 +109,12 @@ namespace Mazaad.API
                 });
             }
 
+            app.UseStaticFiles();
+
             app.UseCors();
             app.UseHttpsRedirection();
+
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllers();
@@ -84,6 +122,7 @@ namespace Mazaad.API
             // ─── SignalR Hubs ─────────────────────────────────────────────────────
             app.MapHub<ChatHub>("/hubs/chat");
             app.MapHub<BiddingHub>("/hubs/bidding");
+            app.MapHub<AuctionHub>("/hubs/auction");
 
             app.Run();
         }

@@ -1,124 +1,256 @@
-using System.Threading.Tasks;
-using Mazaad.Application.DTOs;
-using Mazaad.Application.Interfaces;
 using Mazaad.API.Hubs;
+using Mazaad.Application.DTOs.Bidding;
+using Mazaad.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Mazaad.API.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/bidding")]
+    [Authorize]
     public class BiddingController : ControllerBase
     {
         private readonly IBiddingService _biddingService;
-        private readonly IHubContext<BiddingHub> _hubContext;
+        private readonly IHubContext<AuctionHub> _hubContext;
+        private readonly ILogger<BiddingController> _logger;
 
-        public BiddingController(IBiddingService biddingService, IHubContext<BiddingHub> hubContext)
+        public BiddingController(
+            IBiddingService biddingService,
+            IHubContext<AuctionHub> hubContext,
+            ILogger<BiddingController> logger)
         {
             _biddingService = biddingService;
             _hubContext = hubContext;
+            _logger = logger;
         }
 
+        #region PLACE BID
+
         /// <summary>
-        /// Place a full bid from the bidding room execution panel.
-        /// After success, broadcasts a real-time update to all listeners on the listing's SignalR group.
+        /// Place secure auction bid
         /// </summary>
         [HttpPost("place-bid")]
-        public async Task<IActionResult> PlaceBid([FromBody] PlaceBidDto request)
+        public async Task<IActionResult> PlaceBid(
+            [FromBody] PlaceBidDto request)
         {
-            // TODO: extract from JWT
-            int currentUserId = 1;
-            int currentCompanyId = 2;
-
-            var result = await _biddingService.PlaceBidAsync(currentUserId, currentCompanyId, request);
-
-            if (!result.Success)
-                return BadRequest(result);
-
-            // Broadcast real-time update to the auction room group
-            var liveUpdate = new LiveBidUpdateDto
+            try
             {
-                ListingId = request.ListingId,
-                BidId = result.NewBidId,
-                DisplayBidderName = result.DisplayBiddersName,
-                NewHighestBid = result.NewPrice,
-                TotalBidCount = result.NewBidCount,
-                Timestamp = System.DateTime.UtcNow
-            };
-            await _hubContext.Clients.Group($"listing-{request.ListingId}")
-                .SendAsync("BidPlaced", liveUpdate);
+                // Extract authenticated user
+                int userId =
+                    int.Parse(User.FindFirst("uid")!.Value);
 
-            return Ok(result);
+                int companyId =
+                    int.Parse(User.FindFirst("companyId")!.Value);
+
+                var result =
+                    await _biddingService.PlaceBidAsync(
+                        userId,
+                        companyId,
+                        request);
+
+                if (!result.Success)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = result.Message
+                    });
+                }
+
+                // Realtime broadcast
+                var liveUpdate = new LiveBidUpdateDto
+                {
+                    ListingId = request.ListingId,
+                    BidId = result.NewBidId,
+                    DisplayBidderName = result.DisplayBiddersName,
+                    NewHighestBid = result.NewPrice,
+                    TotalBidCount = result.NewBidCount,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await _hubContext.Clients
+                    .Group($"auction-{request.ListingId}")
+                    .SendAsync("BidPlaced", liveUpdate);
+
+                _logger.LogInformation(
+                    "Bid placed successfully on listing {ListingId}",
+                    request.ListingId);
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Bid placed successfully.",
+                    data = result
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error while placing bid");
+
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Internal server error."
+                });
+            }
         }
 
+        #endregion
+
+        #region QUICK BID
+
         /// <summary>
-        /// Quick bid from a marketplace card — automatically uses the listing's minimum order quantity.
+        /// Quick predefined increment bid
         /// </summary>
         [HttpPost("quick-bid")]
-        public async Task<IActionResult> QuickBid([FromBody] QuickBidDto request)
+        public async Task<IActionResult> QuickBid(
+            [FromBody] QuickBidDto request)
         {
-            int currentUserId = 1;
-            int currentCompanyId = 2;
-
-            var result = await _biddingService.PlaceQuickBidAsync(currentUserId, currentCompanyId, request);
-
-            if (!result.Success)
-                return BadRequest(result);
-
-            // Broadcast to listing group
-            var liveUpdate = new LiveBidUpdateDto
+            try
             {
-                ListingId = request.ListingId,
-                BidId = result.NewBidId,
-                DisplayBidderName = result.DisplayBiddersName,
-                NewHighestBid = result.NewPrice,
-                TotalBidCount = result.NewBidCount,
-                Timestamp = System.DateTime.UtcNow
-            };
-            await _hubContext.Clients.Group($"listing-{request.ListingId}")
-                .SendAsync("BidPlaced", liveUpdate);
+                int userId =
+                    int.Parse(User.FindFirst("uid")!.Value);
 
-            return Ok(result);
+                int companyId =
+                    int.Parse(User.FindFirst("companyId")!.Value);
+
+                var result =
+                    await _biddingService.PlaceQuickBidAsync(
+                        userId,
+                        companyId,
+                        request);
+
+                if (!result.Success)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = result.Message
+                    });
+                }
+
+                var liveUpdate = new LiveBidUpdateDto
+                {
+                    ListingId = request.ListingId,
+                    BidId = result.NewBidId,
+                    DisplayBidderName = result.DisplayBiddersName,
+                    NewHighestBid = result.NewPrice,
+                    TotalBidCount = result.NewBidCount,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                await _hubContext.Clients
+                    .Group($"auction-{request.ListingId}")
+                    .SendAsync("BidPlaced", liveUpdate);
+
+                return Ok(new
+                {
+                    success = true,
+                    data = result
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Error while placing quick bid");
+
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Internal server error."
+                });
+            }
         }
 
-        /// <summary>All bids for a listing, ordered by amount descending (basic summary).</summary>
+        #endregion
+
+        #region GET BIDS
+
+        /// <summary>
+        /// Get all bids for listing
+        /// </summary>
         [HttpGet("listing/{listingId}")]
-        public async Task<IActionResult> GetBidsForListing(int listingId)
+        public async Task<IActionResult> GetListingBids(
+            int listingId)
         {
-            var bids = await _biddingService.GetBidsForListingAsync(listingId);
+            var bids =
+                await _biddingService
+                    .GetBidsForListingAsync(listingId);
+
             return Ok(bids);
         }
 
         /// <summary>
-        /// Live state for a listing: top 10 bids with full details for the bidding room feed.
-        /// Also used to initialize the SignalR client state on page load.
+        /// Get live auction state
         /// </summary>
         [HttpGet("listing/{listingId}/live")]
-        public async Task<IActionResult> GetLiveBids(int listingId)
+        public async Task<IActionResult> GetLiveBids(
+            int listingId)
         {
-            var bids = await _biddingService.GetLiveBidsAsync(listingId);
-            return Ok(bids);
+            var liveBids =
+                await _biddingService
+                    .GetLiveBidsAsync(listingId);
+
+            return Ok(liveBids);
         }
 
-        /// <summary>Get the full detail of a single bid.</summary>
-        [HttpGet("{id}")]
-        public async Task<IActionResult> GetBidDetail(int id)
+        /// <summary>
+        /// Get bid details
+        /// </summary>
+        [HttpGet("{bidId}")]
+        public async Task<IActionResult> GetBidDetails(
+            int bidId)
         {
-            var bid = await _biddingService.GetBidDetailAsync(id);
-            if (bid == null) return NotFound();
+            var bid =
+                await _biddingService
+                    .GetBidDetailAsync(bidId);
+
+            if (bid == null)
+            {
+                return NotFound(new
+                {
+                    message = "Bid not found."
+                });
+            }
+
             return Ok(bid);
         }
 
-        /// <summary>Cancel / soft-delete a bid (marks status = Cancelled).</summary>
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteBid(int id)
-        {
-            int currentCompanyId = 2;
-            var success = await _biddingService.DeleteBidAsync(id, currentCompanyId);
+        #endregion
 
-            if (!success) return BadRequest("Could not cancel bid.");
+        #region DELETE BID
+
+        /// <summary>
+        /// Cancel bid
+        /// </summary>
+        [HttpDelete("{bidId}")]
+        public async Task<IActionResult> DeleteBid(
+            int bidId)
+        {
+            int companyId =
+                int.Parse(User.FindFirst("companyId")!.Value);
+
+            var success =
+                await _biddingService
+                    .DeleteBidAsync(bidId, companyId);
+
+            if (!success)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Unable to cancel bid."
+                });
+            }
+
             return NoContent();
         }
+
+        #endregion
     }
 }
