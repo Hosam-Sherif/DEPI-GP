@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -65,5 +66,10 @@ namespace Mazaad.Domain.Models
         public Material_Categories Category { get; set; } = null!;
         public ICollection<Bids> Bids { get; set; } = new HashSet<Bids>();
         public ICollection<Chat_Channels> Chat_Channels { get; set; } = new HashSet<Chat_Channels>();
+
+        [Timestamp]
+        public byte[] RowVersion { get; set; }
+
+        public string? image_url { get; set; }
     }
 }
