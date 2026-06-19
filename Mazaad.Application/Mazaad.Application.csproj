@@ -6,17 +6,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.7">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-  </ItemGroup>
-
-  <!-- Application references both Domain and Infrastructure (for AppDbContext) -->
+  <!-- Application references Domain -->
   <ItemGroup>
     <ProjectReference Include="..\Mazaad.Domain\Mazaad.Domain.csproj" />
-    <ProjectReference Include="..\Mazaad.Infrastructure\Mazaad.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

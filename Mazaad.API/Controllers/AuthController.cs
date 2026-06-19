@@ -1,39 +1,48 @@
-﻿using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Collections.Generic;
+using Mazaad.Domain.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-private string GenerateJwtToken(App_Users user)
+namespace Mazaad.API.Controllers
 {
-    var claims = new List<Claim>
+    [ApiController]
+    [Route("api/auth")]
+    public class AuthController : ControllerBase
     {
-        new Claim("uid", user.Id.ToString()),
+        private readonly IConfiguration _configuration;
 
-        new Claim("companyId",
-            user.company_id.ToString()),
+        public AuthController(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
 
-        new Claim(ClaimTypes.Name, user.full_name),
+        private string GenerateJwtToken(App_Users user)
+        {
+            var claims = new List<Claim>
+            {
+                new("uid", user.Id.ToString()),
+                new("companyId", user.CompanyId.ToString()),
+                new(ClaimTypes.Name, user.FullName),
+                new(ClaimTypes.Email, user.Email)
+            };
 
-        new Claim(ClaimTypes.Email, user.email)
-    };
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(_configuration["JWT:Key"]!));
 
-    var key = new SymmetricSecurityKey(
-        Encoding.UTF8.GetBytes(
-            _configuration["JWT:Key"]));
+            var creds = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256);
 
-    var creds = new SigningCredentials(
-        key,
-        SecurityAlgorithms.HmacSha256);
+            var token = new JwtSecurityToken(
+                issuer: _configuration["JWT:Issuer"],
+                audience: _configuration["JWT:Audience"],
+                claims: claims,
+                expires: DateTime.UtcNow.AddDays(7),
+                signingCredentials: creds);
 
-    var token = new JwtSecurityToken(
-        issuer: _configuration["JWT:Issuer"],
-        audience: _configuration["JWT:Audience"],
-        claims: claims,
-        expires: DateTime.UtcNow.AddDays(7),
-        signingCredentials: creds);
-
-    return new JwtSecurityTokenHandler()
-        .WriteToken(token);
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+    }
 }

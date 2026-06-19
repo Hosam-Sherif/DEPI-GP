@@ -1,6 +1,6 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using Mazaad.Application.Interfaces;
+using Mazaad.Application.Interfaces.Services;
 
 namespace Mazaad.API.Controllers
 {

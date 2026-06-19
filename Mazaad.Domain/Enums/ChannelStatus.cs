@@ -1,4 +1,4 @@
-﻿namespace Mazaad.Domain.Enums
+namespace Mazaad.Domain.Enums
 {
     public enum ChannelStatus
     {

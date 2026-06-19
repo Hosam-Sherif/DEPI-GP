@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
 
-namespace Mazaad.Application.Interfaces
+namespace Mazaad.Application.Interfaces.Services
 {
     public interface ICompanyService
     {

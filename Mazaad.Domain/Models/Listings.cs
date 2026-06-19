@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Mazaad.Domain.Enums;
 
@@ -68,7 +67,7 @@ namespace Mazaad.Domain.Models
         public ICollection<Chat_Channels> Chat_Channels { get; set; } = new HashSet<Chat_Channels>();
 
         [Timestamp]
-        public byte[] RowVersion { get; set; }
+        public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
         public string? image_url { get; set; }
     }

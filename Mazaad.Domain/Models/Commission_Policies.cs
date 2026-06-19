@@ -9,7 +9,7 @@ namespace Mazaad.Domain.Models
         [Key]
         public int Id { get; set; }
 
-        public string PolicyName { get; set; }
+        public string PolicyName { get; set; } = string.Empty;
         public decimal CommissionRate { get; set; }
         public decimal MinAmount { get; set; }
         public decimal MaxAmount { get; set; }

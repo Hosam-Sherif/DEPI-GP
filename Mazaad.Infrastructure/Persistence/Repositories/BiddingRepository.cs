@@ -1,4 +1,5 @@
-﻿using Mazaad.Domain.Models;
+using Mazaad.Application.Interfaces.Repositories;
+using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
@@ -19,7 +20,7 @@ namespace Mazaad.Infrastructure.Persistence.Repositories
             return await _context.Listings
                 .Include(x => x.Bids)
                 .Include(x => x.Company)
-                .FirstOrDefaultAsync(x => x.ID == listingId);
+                .FirstOrDefaultAsync(x => x.Id == listingId);
         }
 
         public async Task AddBidAsync(Bids bid)

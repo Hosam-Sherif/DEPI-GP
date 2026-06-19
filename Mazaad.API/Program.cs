@@ -3,8 +3,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Mazaad.Infrastructure.Persistence;
-using Mazaad.Application.Interfaces;
-using Mazaad.Application.Services;
+using Mazaad.Application.Interfaces.Services;
+using Mazaad.Application.Interfaces.Repositories;
+using Mazaad.Infrastructure.Persistence.Repositories;
+using Mazaad.Infrastructure.Services;
+using Mazaad.Infrastructure.Services.Inventory;
+using Mazaad.Infrastructure.Services.SalesOperations;
 using Mazaad.API.Hubs;
 
 namespace Mazaad.API
@@ -64,15 +68,14 @@ namespace Mazaad.API
             builder.Services.AddScoped<IChatService, ChatService>();
             builder.Services.AddScoped<ICompanyService, CompanyService>();
             builder.Services.AddScoped<IIndustryService, IndustryService>();
-            builder.Services.AddScoped<IBiddingService, BiddingService>();
 
             builder.Services.AddScoped<IBiddingRepository, BiddingRepository>();
             builder.Services.AddScoped<IInventoryRepository, InventoryRepository>();
             builder.Services.AddScoped<ISalesRepository, SalesRepository>();
 
-            builder.Services.AddScoped<IBiddingService, BiddingService>();
             builder.Services.AddScoped<IInventoryService, InventoryService>();
             builder.Services.AddScoped<ISalesOperationsService, SalesOperationsService>();
+            builder.Services.AddSingleton<IAuctionPresenceService, AuctionPresenceService>();
 
             builder.Services.AddAuthentication(
                 JwtBearerDefaults.AuthenticationScheme)
@@ -105,14 +108,14 @@ namespace Mazaad.API
                 app.UseSwaggerUI(options =>
                 {
                     options.SwaggerEndpoint("/swagger/v1/swagger.json", "Mazaad API v1");
-                    options.RoutePrefix = string.Empty; // Swagger at root /
+                    options.RoutePrefix = "swagger";
                 });
             }
 
             app.UseStaticFiles();
 
             app.UseCors();
-            app.UseHttpsRedirection();
+            // app.UseHttpsRedirection();
 
             app.UseAuthentication();
             app.UseAuthorization();

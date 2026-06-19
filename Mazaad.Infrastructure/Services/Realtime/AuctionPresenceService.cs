@@ -1,5 +1,5 @@
-﻿using Mazaad.Application.DTOs;
-using Mazaad.Application.Interfaces;
+using Mazaad.Application.DTOs;
+using Mazaad.Application.Interfaces.Services;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;

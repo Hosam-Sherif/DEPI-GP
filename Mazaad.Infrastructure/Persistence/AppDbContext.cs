@@ -25,6 +25,7 @@ namespace Mazaad.Infrastructure.Persistence
         public DbSet<Messages> Messages { get; set; }
         public DbSet<Notifications> Notifications { get; set; }
         public DbSet<Material_Categories> MaterialCategories { get; set; }
+        public DbSet<InventoryItem> InventoryItems { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

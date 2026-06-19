@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using Mazaad.Application.DTOs;
-using Mazaad.Application.Interfaces;
+using Mazaad.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 

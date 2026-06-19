@@ -6,9 +6,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <!-- Infrastructure only depends on Domain — no circular reference -->
+  <!-- Infrastructure depends on Application and Domain -->
   <ItemGroup>
     <ProjectReference Include="..\Mazaad.Domain\Mazaad.Domain.csproj" />
+    <ProjectReference Include="..\Mazaad.Application\Mazaad.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,6 +18,10 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

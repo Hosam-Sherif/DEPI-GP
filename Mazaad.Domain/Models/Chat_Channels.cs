@@ -22,9 +22,9 @@ namespace Mazaad.Domain.Models
         public ChannelStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        public Listings Listing { get; set; }
-        public Companies SellerCompany { get; set; }
-        public Companies BuyerCompany { get; set; }
+        public Listings Listing { get; set; } = null!;
+        public Companies SellerCompany { get; set; } = null!;
+        public Companies BuyerCompany { get; set; } = null!;
         public ICollection<Messages> Messages { get; set; } = new HashSet<Messages>();
     }
 }

@@ -13,16 +13,16 @@ namespace Mazaad.Domain.Models
         [ForeignKey("Industry")]
         public int IndustryId { get; set; }
 
-        public string CompanyName { get; set; }
-        public string CommercialRegNum { get; set; }
-        public string TaxRegistrationNum { get; set; }
-        public string City { get; set; }
-        public string AddressDetails { get; set; }
+        public string CompanyName { get; set; } = string.Empty;
+        public string CommercialRegNum { get; set; } = string.Empty;
+        public string TaxRegistrationNum { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string AddressDetails { get; set; } = string.Empty;
         public bool IsVerified { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
-        public IndustryType Industry { get; set; }
+        public IndustryType Industry { get; set; } = null!;
         public ICollection<App_Users> Users { get; set; } = new HashSet<App_Users>();
         public ICollection<Listings> Listings { get; set; } = new HashSet<Listings>();
         public ICollection<Bids> Bids { get; set; } = new HashSet<Bids>();

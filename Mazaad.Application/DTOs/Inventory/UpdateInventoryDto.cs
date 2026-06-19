@@ -1,17 +1,13 @@
 using Microsoft.AspNetCore.Http;
 
-namespace Mazaad.Application.DTOs
+namespace Mazaad.Application.DTOs.Inventory
 {
-    public class InventoryDto
+    public class UpdateInventoryDto
     {
         public string ProductName { get; set; } = string.Empty;
-
         public string Description { get; set; } = string.Empty;
-
         public decimal StartingPrice { get; set; }
-
-        public int Quantity { get; set; }
-
+        public decimal Quantity { get; set; }
         public IFormFile? Image { get; set; }
     }
 }

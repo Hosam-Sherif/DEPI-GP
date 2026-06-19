@@ -1,6 +1,6 @@
 using Mazaad.API.Hubs;
-using Mazaad.Application.DTOs.Bidding;
-using Mazaad.Application.Interfaces;
+using Mazaad.Application.DTOs;
+using Mazaad.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;

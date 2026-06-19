@@ -1,4 +1,4 @@
-﻿using Mazaad.Domain.Models;
+using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -26,22 +26,22 @@ namespace Mazaad.API.Controllers
             var lastMonthStart = thisMonthStart.AddMonths(-1);
 
             var salesOrders = await _context.Orders
-                .Where(o => o.seller_company_id == companyId)
+                .Where(o => o.SellerCompanyId == companyId)
                 .ToListAsync();
 
-            var thisMonth = salesOrders.Where(o => o.order_date >= thisMonthStart).ToList();
-            var lastMonth = salesOrders.Where(o => o.order_date >= lastMonthStart && o.order_date < thisMonthStart).ToList();
+            var thisMonth = salesOrders.Where(o => o.OrderDate >= thisMonthStart).ToList();
+            var lastMonth = salesOrders.Where(o => o.OrderDate >= lastMonthStart && o.OrderDate < thisMonthStart).ToList();
 
-            var thisMonthRevenue = thisMonth.Sum(o => o.agreed_quantity * o.agreed_unit_price);
-            var lastMonthRevenue = lastMonth.Sum(o => o.agreed_quantity * o.agreed_unit_price);
+            var thisMonthRevenue = thisMonth.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice);
+            var lastMonthRevenue = lastMonth.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice);
             var revenueGrowth = lastMonthRevenue == 0 ? 100 :
                 Math.Round((double)(thisMonthRevenue - lastMonthRevenue) / (double)lastMonthRevenue * 100, 2);
 
             return Ok(new
             {
-                company_id = companyId,
+                CompanyId = companyId,
                 total_orders = salesOrders.Count,
-                total_revenue = Math.Round(salesOrders.Sum(o => o.agreed_quantity * o.agreed_unit_price), 2),
+                total_revenue = Math.Round(salesOrders.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice), 2),
                 this_month = new
                 {
                     orders = thisMonth.Count,
@@ -63,16 +63,16 @@ namespace Mazaad.API.Controllers
             var fromDate = DateTime.UtcNow.AddMonths(-months);
 
             var result = await _context.Orders
-                .Where(o => o.seller_company_id == companyId && o.order_date >= fromDate)
-                .GroupBy(o => new { Year = o.order_date.Year, Month = o.order_date.Month })
+                .Where(o => o.SellerCompanyId == companyId && o.OrderDate >= fromDate)
+                .GroupBy(o => new { Year = o.OrderDate.Year, Month = o.OrderDate.Month })
                 .Select(g => new
                 {
                     Year = g.Key.Year,
                     Month = g.Key.Month,
                     TotalOrders = g.Count(),
-                    TotalRevenue = Math.Round(g.Sum(o => o.agreed_quantity * o.agreed_unit_price), 2),
-                    TotalQuantity = g.Sum(o => o.agreed_quantity),
-                    AverageOrderValue = Math.Round(g.Average(o => o.agreed_quantity * o.agreed_unit_price), 2)
+                    TotalRevenue = Math.Round(g.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice), 2),
+                    TotalQuantity = g.Sum(o => o.AgreedQuantity),
+                    AverageOrderValue = Math.Round(g.Average(o => o.AgreedQuantity * o.AgreedUnitPrice), 2)
                 })
                 .OrderBy(x => x.Year)
                 .ThenBy(x => x.Month)
@@ -88,20 +88,20 @@ namespace Mazaad.API.Controllers
                 .Include(o => o.Bid)
                     .ThenInclude(b => b.Listing)
                         .ThenInclude(l => l.Category)
-                .Where(o => o.seller_company_id == companyId)
+                .Where(o => o.SellerCompanyId == companyId)
                 .GroupBy(o => new
                 {
-                    CategoryId = o.Bid.Listing.category_id,
-                    CategoryName = o.Bid.Listing.Category.category_name
+                    CategoryId = o.Bid.Listing.CategoryId,
+                    CategoryName = o.Bid.Listing.Category.CategoryName
                 })
                 .Select(g => new
                 {
                     CategoryId = g.Key.CategoryId,
                     CategoryName = g.Key.CategoryName,
                     TotalOrders = g.Count(),
-                    TotalRevenue = Math.Round(g.Sum(o => o.agreed_quantity * o.agreed_unit_price), 2),
-                    TotalQuantitySold = g.Sum(o => o.agreed_quantity),
-                    AveragePrice = Math.Round(g.Average(o => o.agreed_unit_price), 2)
+                    TotalRevenue = Math.Round(g.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice), 2),
+                    TotalQuantitySold = g.Sum(o => o.AgreedQuantity),
+                    AveragePrice = Math.Round(g.Average(o => o.AgreedUnitPrice), 2)
                 })
                 .OrderByDescending(x => x.TotalRevenue)
                 .Take(top)
@@ -115,15 +115,15 @@ namespace Mazaad.API.Controllers
         {
             var result = await _context.Orders
                 .Include(o => o.BuyerCompany)
-                .Where(o => o.seller_company_id == companyId)
-                .GroupBy(o => new { o.buyer_company_id, CompanyName = o.BuyerCompany.company_name, City = o.BuyerCompany.city })
+                .Where(o => o.SellerCompanyId == companyId)
+                .GroupBy(o => new { o.BuyerCompanyId, CompanyName = o.BuyerCompany.CompanyName, City = o.BuyerCompany.City })
                 .Select(g => new
                 {
-                    BuyerCompanyId = g.Key.buyer_company_id,
+                    BuyerCompanyId = g.Key.BuyerCompanyId,
                     BuyerName = g.Key.CompanyName,
                     City = g.Key.City,
                     TotalOrders = g.Count(),
-                    TotalSpent = Math.Round(g.Sum(o => o.agreed_quantity * o.agreed_unit_price), 2)
+                    TotalSpent = Math.Round(g.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice), 2)
                 })
                 .OrderByDescending(x => x.TotalSpent)
                 .Take(top)
@@ -150,35 +150,35 @@ namespace Mazaad.API.Controllers
             var now = DateTime.UtcNow;
 
             var activeListings = await _context.Listings
-                .Where(l => l.company_id == companyId && l.start_date <= now && l.end_date >= now)
+                .Where(l => l.CompanyId == companyId && l.StartDate <= now && l.EndDate >= now)
                 .CountAsync();
 
             var closedListings = await _context.Listings
-                .Where(l => l.company_id == companyId && l.end_date < now)
+                .Where(l => l.CompanyId == companyId && l.EndDate < now)
                 .CountAsync();
 
             var pendingOrders = await _context.Orders
-                .Where(o => o.seller_company_id == companyId)
+                .Where(o => o.SellerCompanyId == companyId)
                 .CountAsync();
 
             var totalBidsReceived = await _context.Bids
                 .Include(b => b.Listing)
-                .Where(b => b.Listing.company_id == companyId)
+                .Where(b => b.Listing.CompanyId == companyId)
                 .CountAsync();
 
             var recentBids = await _context.Bids
                 .Include(b => b.Listing)
                 .Include(b => b.BuyerCompany)
-                .Where(b => b.Listing.company_id == companyId)
-                .OrderByDescending(b => b.bid_time)
+                .Where(b => b.Listing.CompanyId == companyId)
+                .OrderByDescending(b => b.CreatedAt)
                 .Take(5)
                 .Select(b => new
                 {
                     b.Id,
-                    ListingTitle = b.Listing.title,
-                    BidderName = b.is_anonymous ? b.anonymous_name : b.BuyerCompany.company_name,
-                    b.bid_amount_per_unit,
-                    b.bid_time
+                    ListingTitle = b.Listing.Title,
+                    BidderName = b.IsAnonymous ? "Anonymous" : b.BuyerCompany.CompanyName,
+                    b.BidAmountPerUnit,
+                    b.CreatedAt
                 })
                 .ToListAsync();
 
@@ -186,24 +186,24 @@ namespace Mazaad.API.Controllers
                 .Include(o => o.BuyerCompany)
                 .Include(o => o.Bid)
                     .ThenInclude(b => b.Listing)
-                .Where(o => o.seller_company_id == companyId)
-                .OrderByDescending(o => o.order_date)
+                .Where(o => o.SellerCompanyId == companyId)
+                .OrderByDescending(o => o.OrderDate)
                 .Take(5)
                 .Select(o => new
                 {
                     o.Id,
-                    BuyerName = o.BuyerCompany.company_name,
-                    ListingTitle = o.Bid.Listing.title,
-                    o.agreed_quantity,
-                    o.agreed_unit_price,
-                    TotalValue = o.agreed_quantity * o.agreed_unit_price,
-                    o.order_date
+                    BuyerName = o.BuyerCompany.CompanyName,
+                    ListingTitle = o.Bid.Listing.Title,
+                    o.AgreedQuantity,
+                    o.AgreedUnitPrice,
+                    TotalValue = o.AgreedQuantity * o.AgreedUnitPrice,
+                    o.OrderDate
                 })
                 .ToListAsync();
 
             return Ok(new
             {
-                company_id = companyId,
+                CompanyId = companyId,
                 timestamp = now,
                 overview = new
                 {
@@ -225,24 +225,24 @@ namespace Mazaad.API.Controllers
             var auctions = await _context.Listings
                 .Include(l => l.Category)
                 .Include(l => l.Bids)
-                .Where(l => l.company_id == companyId && l.start_date <= now && l.end_date >= now)
+                .Where(l => l.CompanyId == companyId && l.StartDate <= now && l.EndDate >= now)
                 .Select(l => new
                 {
-                    l.ID,
-                    l.title,
-                    CategoryName = l.Category.category_name,
-                    l.available_quantity,
-                    l.current_price,
-                    l.end_date,
-                    TimeRemaining = l.end_date - now,
+                    l.Id,
+                    l.Title,
+                    CategoryName = l.Category.CategoryName,
+                    l.AvailableQuantity,
+                    l.CurrentHighestBid,
+                    l.EndDate,
+                    TimeRemaining = l.EndDate - now,
                     TotalBids = l.Bids.Count,
-                    TopBid = l.Bids.Any() ? l.Bids.Max(b => b.bid_amount_per_unit) : 0
+                    TopBid = l.Bids.Any() ? l.Bids.Max(b => b.BidAmountPerUnit) : 0
                 })
                 .ToListAsync();
 
             return Ok(new
             {
-                company_id = companyId,
+                CompanyId = companyId,
                 active_auctions_count = auctions.Count,
                 auctions
             });
@@ -254,17 +254,17 @@ namespace Mazaad.API.Controllers
             var bids = await _context.Bids
                 .Include(b => b.Listing)
                 .Include(b => b.BuyerCompany)
-                .Where(b => b.Listing.company_id == companyId)
-                .OrderByDescending(b => b.bid_time)
+                .Where(b => b.Listing.CompanyId == companyId)
+                .OrderByDescending(b => b.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(b => new
                 {
                     Type = "Bid",
-                    Description = $"Bid on {b.Listing.title}",
-                    Actor = b.is_anonymous ? b.anonymous_name : b.BuyerCompany.company_name,
-                    Amount = b.bid_amount_per_unit,
-                    Timestamp = b.bid_time
+                    Description = $"Bid on {b.Listing.Title}",
+                    Actor = b.IsAnonymous ? "Anonymous" : b.BuyerCompany.CompanyName,
+                    Amount = b.BidAmountPerUnit,
+                    Timestamp = b.CreatedAt
                 })
                 .ToListAsync();
 
@@ -272,17 +272,17 @@ namespace Mazaad.API.Controllers
                 .Include(o => o.BuyerCompany)
                 .Include(o => o.Bid)
                     .ThenInclude(b => b.Listing)
-                .Where(o => o.seller_company_id == companyId)
-                .OrderByDescending(o => o.order_date)
+                .Where(o => o.SellerCompanyId == companyId)
+                .OrderByDescending(o => o.OrderDate)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .Select(o => new
                 {
                     Type = "Order",
-                    Description = $"Purchase order for {o.Bid.Listing.title}",
-                    Actor = o.BuyerCompany.company_name,
-                    Amount = o.agreed_quantity * o.agreed_unit_price,
-                    Timestamp = o.order_date
+                    Description = $"Purchase order for {o.Bid.Listing.Title}",
+                    Actor = o.BuyerCompany.CompanyName,
+                    Amount = o.AgreedQuantity * o.AgreedUnitPrice,
+                    Timestamp = o.OrderDate
                 })
                 .ToListAsync();
 
@@ -294,7 +294,7 @@ namespace Mazaad.API.Controllers
 
             return Ok(new
             {
-                company_id = companyId,
+                CompanyId = companyId,
                 page,
                 page_size = pageSize,
                 activities = activityLog

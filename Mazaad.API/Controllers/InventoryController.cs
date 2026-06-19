@@ -1,4 +1,5 @@
-﻿using Mazaad.Domain.Models;
+using Mazaad.Domain.Models;
+using Mazaad.Domain.Enums;
 using Mazaad.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -48,7 +49,7 @@ namespace Mazaad.API.Controllers
                     i.status,
                     i.image_name,
                     ImageUrl = i.image_path != null ? $"/api/inventory/image/{i.Id}" : null,
-                    CategoryName = i.Category.category_name,
+                    CategoryName = i.Category.CategoryName,
                     i.created_at,
                     i.updated_at
                 })
@@ -85,8 +86,8 @@ namespace Mazaad.API.Controllers
                 item.status,
                 item.image_name,
                 ImageUrl = item.image_path != null ? $"/api/inventory/image/{item.Id}" : null,
-                CategoryName = item.Category.category_name,
-                CompanyName = item.Company.company_name,
+                CategoryName = item.Category.CategoryName,
+                CompanyName = item.Company.CompanyName,
                 item.created_at,
                 item.updated_at
             });
@@ -99,7 +100,7 @@ namespace Mazaad.API.Controllers
             if (company == null)
                 return NotFound(new { message = "Company not found." });
 
-            var category = await _context.Material_Categories.FindAsync(dto.category_id);
+            var category = await _context.MaterialCategories.FindAsync(dto.category_id);
             if (category == null)
                 return NotFound(new { message = "Category not found." });
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Mazaad.Application.DTOs
 {
@@ -7,7 +7,7 @@ namespace Mazaad.Application.DTOs
         public int Id { get; set; }
         public int ChannelId { get; set; }
         public int SenderUserId { get; set; }
-        public string MessageText { get; set; }
+        public string MessageText { get; set; } = string.Empty;
         public DateTime SentAt { get; set; }
     }
 }

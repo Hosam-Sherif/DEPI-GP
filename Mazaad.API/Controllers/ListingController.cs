@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
-using Mazaad.Application.Interfaces;
+using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 

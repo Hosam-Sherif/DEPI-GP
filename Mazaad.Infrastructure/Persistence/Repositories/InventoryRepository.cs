@@ -1,4 +1,5 @@
-﻿using Mazaad.Domain.Models;
+using Mazaad.Application.Interfaces.Repositories;
+using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
@@ -24,15 +25,15 @@ namespace Mazaad.Infrastructure.Persistence.Repositories
             GetCompanyInventoryAsync(int companyId)
         {
             return await _context.Listings
-                .Where(x => x.company_id == companyId)
-                .OrderByDescending(x => x.created_at)
+                .Where(x => x.CompanyId == companyId)
+                .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
         }
 
         public async Task<Listings?> GetByIdAsync(int id)
         {
             return await _context.Listings
-                .FirstOrDefaultAsync(x => x.ID == id);
+                .FirstOrDefaultAsync(x => x.Id == id);
         }
 
         public async Task SaveChangesAsync()

@@ -1,8 +1,8 @@
-﻿using Mazaad.Application.DTOs;
+using Mazaad.Application.DTOs;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace Mazaad.Application.Interfaces
+namespace Mazaad.Application.Interfaces.Services
 {
     public interface IAuctionPresenceService
     {

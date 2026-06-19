@@ -1,7 +1,8 @@
-﻿using Mazaad.Application.DTOs.Inventory;
+using Mazaad.Application.DTOs.Inventory;
 using Mazaad.Application.Interfaces.Repositories;
 using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Models;
+using Microsoft.AspNetCore.Hosting;
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -56,24 +57,25 @@ namespace Mazaad.Infrastructure.Services.Inventory
 
             var listing = new Listings
             {
-                title = dto.ProductName,
+                Title = dto.ProductName,
 
-                description = dto.Description,
+                Description = dto.Description,
 
-                starting_price =
+                CurrentHighestBid =
                     dto.StartingPrice,
 
-                current_price =
-                    dto.StartingPrice,
+                MinOrderQuantity = 1,
 
-                quantity = dto.Quantity,
+                AvailableQuantity = dto.Quantity,
 
-                company_id = companyId,
+                CompanyId = companyId,
 
-                image_url =
+                ImageUrl =
                     $"/uploads/products/{imageName}",
 
-                created_at = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+
+                UpdatedAt = DateTime.UtcNow
             };
 
             await _repository.AddAsync(listing);
@@ -82,9 +84,9 @@ namespace Mazaad.Infrastructure.Services.Inventory
 
             return new
             {
-                listing.ID,
-                listing.title,
-                listing.image_url
+                listing.Id,
+                listing.Title,
+                listing.ImageUrl
             };
         }
 
@@ -98,14 +100,14 @@ namespace Mazaad.Infrastructure.Services.Inventory
             if (listing == null)
                 throw new Exception("Listing not found");
 
-            listing.title = dto.ProductName;
+            listing.Title = dto.ProductName;
 
-            listing.description = dto.Description;
+            listing.Description = dto.Description;
 
-            listing.starting_price =
+            listing.CurrentHighestBid =
                 dto.StartingPrice;
 
-            listing.quantity = dto.Quantity;
+            listing.AvailableQuantity = dto.Quantity;
 
             if (dto.Image != null)
             {
@@ -131,9 +133,11 @@ namespace Mazaad.Infrastructure.Services.Inventory
 
                 await dto.Image.CopyToAsync(stream);
 
-                listing.image_url =
+                listing.ImageUrl =
                     $"/uploads/products/{imageName}";
             }
+
+            listing.UpdatedAt = DateTime.UtcNow;
 
             await _repository.SaveChangesAsync();
 
@@ -162,12 +166,12 @@ namespace Mazaad.Infrastructure.Services.Inventory
 
             return listings.Select(x => new
             {
-                x.ID,
-                x.title,
-                x.current_price,
-                x.quantity,
-                x.image_url,
-                x.created_at
+                x.Id,
+                x.Title,
+                x.CurrentHighestBid,
+                x.AvailableQuantity,
+                x.ImageUrl,
+                x.CreatedAt
             });
         }
     }

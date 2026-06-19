@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
-using Mazaad.Application.Interfaces;
+using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace Mazaad.Application.Services
+namespace Mazaad.Infrastructure.Services
 {
     public class MaterialCategoryService : IMaterialCategoryService
     {

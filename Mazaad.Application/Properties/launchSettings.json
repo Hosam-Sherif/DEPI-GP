@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Mazaad.Application": {
+      "commandName": "Project",
+      "debugEngines": "managed,native"
+    }
+  }
+}

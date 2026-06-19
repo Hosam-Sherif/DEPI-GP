@@ -1,5 +1,5 @@
-﻿using System.Threading.Tasks;
-using Mazaad.Application.Interfaces;
+using System.Threading.Tasks;
+using Mazaad.Application.Interfaces.Services;
 using Microsoft.AspNetCore.SignalR;
 
 namespace Mazaad.API.Hubs
