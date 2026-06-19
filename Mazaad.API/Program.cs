@@ -77,6 +77,8 @@ namespace Mazaad.API
             builder.Services.AddScoped<ISalesOperationsService, SalesOperationsService>();
             builder.Services.AddSingleton<IAuctionPresenceService, AuctionPresenceService>();
 
+            builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+
             builder.Services.AddAuthentication(
                 JwtBearerDefaults.AuthenticationScheme)
                 .AddJwtBearer(options =>
