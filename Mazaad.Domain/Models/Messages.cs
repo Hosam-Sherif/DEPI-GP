@@ -20,6 +20,6 @@ namespace Mazaad.Domain.Models
         public DateTime SentAt { get; set; }
 
         public Chat_Channels Channel { get; set; } = null!;
-        public App_Users SenderUser { get; set; } = null!;
+        public ApplicationUser SenderUser { get; set; } = null!;
     }
 }

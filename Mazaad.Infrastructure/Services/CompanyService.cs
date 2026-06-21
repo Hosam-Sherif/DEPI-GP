@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
+using Mazaad.Domain.Enums;
 using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -48,10 +49,11 @@ namespace Mazaad.Infrastructure.Services
                 TaxRegistrationNum = request.TaxRegistrationNum,
                 City = request.City,
                 AddressDetails = request.AddressDetails,
-                IsVerified = false,
+                VerificationStatus = CompanyVerificationStatus.Pending,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
+
 
             _context.Companies.Add(company);
             await _context.SaveChangesAsync();
@@ -67,7 +69,7 @@ namespace Mazaad.Infrastructure.Services
             var company = await _context.Companies.FindAsync(id);
             if (company == null) return false;
 
-            company.IsVerified = true;
+            company.VerificationStatus = CompanyVerificationStatus.Verified;
             company.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();

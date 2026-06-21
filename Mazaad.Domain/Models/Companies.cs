@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Mazaad.Domain.Enums;
 
 namespace Mazaad.Domain.Models
 {
@@ -18,17 +19,49 @@ namespace Mazaad.Domain.Models
         public string TaxRegistrationNum { get; set; } = string.Empty;
         public string City { get; set; } = string.Empty;
         public string AddressDetails { get; set; } = string.Empty;
-        public bool IsVerified { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
+
+        // ── Verification ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Replaces the old bool IsVerified.
+        /// Supports the full state machine: Pending → Verified | Rejected | Suspended.
+        /// </summary>
+        public CompanyVerificationStatus VerificationStatus { get; set; }
+            = CompanyVerificationStatus.Pending;
+
+        /// <summary>Set by admin on verification or rejection.</summary>
+        public int? VerifiedByUserId { get; set; }
+
+        public DateTime? VerifiedAt { get; set; }
+
+        /// <summary>Populated when status = Rejected or Suspended.</summary>
+        public string? RejectionReason { get; set; }
+
+        // ── Timestamps ─────────────────────────────────────────────────────────
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        // ── Navigation ─────────────────────────────────────────────────────────
 
         public IndustryType Industry { get; set; } = null!;
-        public ICollection<App_Users> Users { get; set; } = new HashSet<App_Users>();
+
+        /// <summary>All users that belong to this company.</summary>
+        public ICollection<ApplicationUser> Users { get; set; } = new HashSet<ApplicationUser>();
+
         public ICollection<Listings> Listings { get; set; } = new HashSet<Listings>();
         public ICollection<Bids> Bids { get; set; } = new HashSet<Bids>();
+
         public virtual ICollection<Orders> SalesOrders { get; set; } = new HashSet<Orders>();
         public virtual ICollection<Orders> PurchaseOrders { get; set; } = new HashSet<Orders>();
+
         public virtual ICollection<Chat_Channels> SellerChatChannels { get; set; } = new HashSet<Chat_Channels>();
         public virtual ICollection<Chat_Channels> BuyerChatChannels { get; set; } = new HashSet<Chat_Channels>();
+
+        // ── Computed helpers ───────────────────────────────────────────────────
+
+        public bool IsVerified => VerificationStatus == CompanyVerificationStatus.Verified;
+        public bool IsActive => VerificationStatus != CompanyVerificationStatus.Rejected
+                             && VerificationStatus != CompanyVerificationStatus.Suspended;
     }
 }

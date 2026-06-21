@@ -35,7 +35,7 @@ namespace Mazaad.Domain.Models
 
         // Navigation
         public Listings Listing { get; set; } = null!;
-        public App_Users User { get; set; } = null!;
+        public ApplicationUser User { get; set; } = null!;
         public Companies BuyerCompany { get; set; } = null!;
         public ICollection<Orders> Orders { get; set; } = new HashSet<Orders>();
     }

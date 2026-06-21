@@ -17,6 +17,6 @@ namespace Mazaad.Domain.Models
         public int ReferenceId { get; set; }
         public DateTime CreatedAt { get; set; }
 
-        public App_Users User { get; set; } = null!;
+        public ApplicationUser User { get; set; } = null!;
     }
 }
