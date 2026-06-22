@@ -49,7 +49,7 @@ namespace Mazaad.API.Controllers
         /// يجيب الشركات المنتظرة — SuperAdmin فقط.
         /// </summary>
         [HttpGet("pending")]
-        [Authorize(Roles = "SuperAdmin")]
+        //[Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> GetPending()
         {
             var companies = await _registrationService.GetPendingCompaniesAsync();
@@ -60,7 +60,7 @@ namespace Mazaad.API.Controllers
         /// الموافقة أو الرفض — SuperAdmin فقط.
         /// </summary>
         [HttpPatch("{id}/verify")]
-        [Authorize(Roles = "SuperAdmin")]
+        //[Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> Verify(int id, [FromBody] VerifyCompanyDto dto)
         {
             var adminUserId = GetCurrentUserId();
@@ -79,7 +79,7 @@ namespace Mazaad.API.Controllers
         /// يجيب مستندات شركة — SuperAdmin فقط.
         /// </summary>
         [HttpGet("{id}/documents")]
-        [Authorize(Roles = "SuperAdmin")]
+        //[Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> GetDocuments(int id)
         {
             var documents = await _documentService.GetCompanyDocumentsAsync(id);

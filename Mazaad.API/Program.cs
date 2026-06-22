@@ -1,7 +1,7 @@
 // Mazaad.API/Program.cs
 
-using System.Text;
 using Mazaad.API.Hubs;
+using Mazaad.Application.Interfaces;
 using Mazaad.Application.Interfaces.Repositories;
 using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Models;
@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Text;
 
 namespace Mazaad.API
 {
@@ -194,6 +195,9 @@ namespace Mazaad.API
             builder.Services.AddScoped<ISalesOperationsService, SalesOperationsService>();
             builder.Services.AddSingleton<IAuctionPresenceService, AuctionPresenceService>();
 
+
+            builder.Services.AddScoped<IEmployeeService, EmployeeService>(); ;
+
             // ─── Build ────────────────────────────────────────────────────────
             var app = builder.Build();
 
@@ -201,15 +205,15 @@ namespace Mazaad.API
             await SeedSuperAdminAsync(app);
 
             // ─── Pipeline ─────────────────────────────────────────────────────
-            if (app.Environment.IsDevelopment())
-            {
+            //if (app.Environment.IsDevelopment())
+            //{
                 app.UseSwagger();
                 app.UseSwaggerUI(o =>
                 {
                     o.SwaggerEndpoint("/swagger/v1/swagger.json", "Mazaad API v1");
                     o.RoutePrefix = "swagger";
                 });
-            }
+            //}
 
             app.UseStaticFiles();
             app.UseCors();

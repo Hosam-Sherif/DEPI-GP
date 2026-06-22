@@ -29,6 +29,21 @@ namespace Mazaad.Infrastructure.Services.Auth
             _securityLog = securityLog;
         }
 
+        public async Task<CompanyUserResponseDto?> GetUserByIdAsync(int companyId, int userId)
+        {
+            // بنجيب اليوزر بناءً على الـ Id والـ CompanyId للتأكد إنه تبع الشركة دي
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == userId && u.CompanyId == companyId);
+
+            if (user == null)
+                return null;
+
+            // بنجيب الـ Roles الخاصة باليوزر ده عن طريق الـ UserManager
+            var roles = await _userManager.GetRolesAsync(user);
+
+            // بنعمل Map للـ Entity ونرجعها DTO باستخدام الـ Helper ميثود بتاعتك
+            return MapToDto(user, roles);
+        }
         // ── Get Company Users ─────────────────────────────────────────────────
         public async Task<IEnumerable<CompanyUserResponseDto>> GetUsersAsync(int companyId)
         {
