@@ -60,23 +60,38 @@ namespace Mazaad.API.Controllers
         [HttpGet("company/{companyId}/monthly")]
         public async Task<IActionResult> GetMonthlySales(int companyId, [FromQuery] int months = 12)
         {
+            if (months < 1 || months > 60)
+                return BadRequest(new { message = "months must be between 1 and 60." });
+
             var fromDate = DateTime.UtcNow.AddMonths(-months);
 
-            var result = await _context.Orders
+            // نجيب البيانات الخام الأول (بدون Math.Round في SQL عشان EF Core بيترجمها غلط أحياناً)
+            var raw = await _context.Orders
                 .Where(o => o.SellerCompanyId == companyId && o.OrderDate >= fromDate)
-                .GroupBy(o => new { Year = o.OrderDate.Year, Month = o.OrderDate.Month })
+                .Select(o => new
+                {
+                    Year = o.OrderDate.Year,
+                    Month = o.OrderDate.Month,
+                    Revenue = o.AgreedQuantity * o.AgreedUnitPrice,
+                    Quantity = o.AgreedQuantity
+                })
+                .ToListAsync();
+
+            // GroupBy + الحسابات على الـ client بعد ما جبنا البيانات
+            var result = raw
+                .GroupBy(o => new { o.Year, o.Month })
                 .Select(g => new
                 {
                     Year = g.Key.Year,
                     Month = g.Key.Month,
                     TotalOrders = g.Count(),
-                    TotalRevenue = Math.Round(g.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice), 2),
-                    TotalQuantity = g.Sum(o => o.AgreedQuantity),
-                    AverageOrderValue = Math.Round(g.Average(o => o.AgreedQuantity * o.AgreedUnitPrice), 2)
+                    TotalRevenue = Math.Round(g.Sum(o => o.Revenue), 2),
+                    TotalQuantity = g.Sum(o => o.Quantity),
+                    AverageOrderValue = Math.Round(g.Average(o => o.Revenue), 2)
                 })
                 .OrderBy(x => x.Year)
                 .ThenBy(x => x.Month)
-                .ToListAsync();
+                .ToList();
 
             return Ok(result);
         }
@@ -84,28 +99,40 @@ namespace Mazaad.API.Controllers
         [HttpGet("company/{companyId}/top-products")]
         public async Task<IActionResult> GetTopProducts(int companyId, [FromQuery] int top = 5)
         {
-            var result = await _context.Orders
-                .Include(o => o.Bid)
-                    .ThenInclude(b => b.Listing)
-                        .ThenInclude(l => l.Category)
-                .Where(o => o.SellerCompanyId == companyId)
-                .GroupBy(o => new
+            if (top < 1 || top > 50)
+                return BadRequest(new { message = "top must be between 1 and 50." });
+
+            // نعمل Select أولاً بدل Include+GroupBy على navigation properties
+            // لأن EF Core مش بيترجم GroupBy على nested nav-props لـ SQL صح
+            var raw = await _context.Orders
+                .Where(o => o.SellerCompanyId == companyId
+                         && o.Bid != null
+                         && o.Bid.Listing != null
+                         && o.Bid.Listing.Category != null)
+                .Select(o => new
                 {
                     CategoryId = o.Bid.Listing.CategoryId,
-                    CategoryName = o.Bid.Listing.Category.CategoryName
+                    CategoryName = o.Bid.Listing.Category.CategoryName,
+                    Revenue = o.AgreedQuantity * o.AgreedUnitPrice,
+                    Quantity = o.AgreedQuantity,
+                    UnitPrice = o.AgreedUnitPrice
                 })
+                .ToListAsync();
+
+            var result = raw
+                .GroupBy(o => new { o.CategoryId, o.CategoryName })
                 .Select(g => new
                 {
                     CategoryId = g.Key.CategoryId,
                     CategoryName = g.Key.CategoryName,
                     TotalOrders = g.Count(),
-                    TotalRevenue = Math.Round(g.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice), 2),
-                    TotalQuantitySold = g.Sum(o => o.AgreedQuantity),
-                    AveragePrice = Math.Round(g.Average(o => o.AgreedUnitPrice), 2)
+                    TotalRevenue = Math.Round(g.Sum(o => o.Revenue), 2),
+                    TotalQuantitySold = g.Sum(o => o.Quantity),
+                    AveragePrice = Math.Round(g.Average(o => o.UnitPrice), 2)
                 })
                 .OrderByDescending(x => x.TotalRevenue)
                 .Take(top)
-                .ToListAsync();
+                .ToList();
 
             return Ok(result);
         }
@@ -113,21 +140,35 @@ namespace Mazaad.API.Controllers
         [HttpGet("company/{companyId}/top-buyers")]
         public async Task<IActionResult> GetTopBuyers(int companyId, [FromQuery] int top = 5)
         {
-            var result = await _context.Orders
-                .Include(o => o.BuyerCompany)
+            if (top < 1 || top > 50)
+                return BadRequest(new { message = "top must be between 1 and 50." });
+
+            // نعمل Select أولاً بدل Include+GroupBy على navigation properties
+            // عشان EF Core بيترجم GroupBy على o.BuyerCompany.CompanyName لـ SQL غلط
+            var raw = await _context.Orders
                 .Where(o => o.SellerCompanyId == companyId)
-                .GroupBy(o => new { o.BuyerCompanyId, CompanyName = o.BuyerCompany.CompanyName, City = o.BuyerCompany.City })
+                .Select(o => new
+                {
+                    o.BuyerCompanyId,
+                    CompanyName = o.BuyerCompany.CompanyName,
+                    City = o.BuyerCompany.City,
+                    Revenue = o.AgreedQuantity * o.AgreedUnitPrice
+                })
+                .ToListAsync();
+
+            var result = raw
+                .GroupBy(o => new { o.BuyerCompanyId, o.CompanyName, o.City })
                 .Select(g => new
                 {
                     BuyerCompanyId = g.Key.BuyerCompanyId,
                     BuyerName = g.Key.CompanyName,
                     City = g.Key.City,
                     TotalOrders = g.Count(),
-                    TotalSpent = Math.Round(g.Sum(o => o.AgreedQuantity * o.AgreedUnitPrice), 2)
+                    TotalSpent = Math.Round(g.Sum(o => o.Revenue), 2)
                 })
                 .OrderByDescending(x => x.TotalSpent)
                 .Take(top)
-                .ToListAsync();
+                .ToList();
 
             return Ok(result);
         }

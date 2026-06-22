@@ -4,6 +4,7 @@ using Mazaad.API.Hubs;
 using Mazaad.Application.Interfaces;
 using Mazaad.Application.Interfaces.Repositories;
 using Mazaad.Application.Interfaces.Services;
+using Mazaad.Domain.Enums;
 using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
 using Mazaad.Infrastructure.Persistence.Repositories;
@@ -204,6 +205,9 @@ namespace Mazaad.API
             // ─── Seed SuperAdmin ──────────────────────────────────────────────
             await SeedSuperAdminAsync(app);
 
+            // ─── Seed Demo Data (dev only) ────────────────────────────────────
+            await SeedDemoDataAsync(app);
+
             // ─── Pipeline ─────────────────────────────────────────────────────
             //if (app.Environment.IsDevelopment())
             //{
@@ -260,6 +264,173 @@ namespace Mazaad.API
 
             await userManager.CreateAsync(superAdmin, password);
             await userManager.AddToRoleAsync(superAdmin, "SuperAdmin");
+        }
+
+        // ── Seed Demo Data ────────────────────────────────────────────────────
+        /// <summary>
+        /// بيضيف orders اختبار لـ company 4 الموجودة في الـ DB عشان الـ Sales Statistics APIs مش تبقى فاضية.
+        /// Idempotent: بيشتغل بس لو company 4 معهاش orders.
+        /// </summary>
+        private static async Task SeedDemoDataAsync(WebApplication app)
+        {
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+            // ── اجيب الـ seller company (id=4 اللي بيستخدمه اليوزر) ──────────
+            var sellerCompany = await db.Companies.FindAsync(4);
+            if (sellerCompany == null)
+            {
+                // لو 4 مش موجود، جيب أي company موجودة
+                sellerCompany = await db.Companies.FirstOrDefaultAsync();
+                if (sellerCompany == null) return; // مفيش companies خالص
+            }
+
+            // لو الـ company دي عندها orders بالفعل → skip
+            if (await db.Orders.AnyAsync(o => o.SellerCompanyId == sellerCompany.Id))
+                return;
+
+            // ── جيب أو اعمل buyer companies ──────────────────────────────────
+            // نجيب أي 2 companies تانية كـ buyers
+            var otherCompanies = await db.Companies
+                .Where(c => c.Id != sellerCompany.Id)
+                .Take(2)
+                .ToListAsync();
+
+            // لو مفيش companies تانية كفاية، نعملهم
+            var industryId = sellerCompany.IndustryId;
+            while (otherCompanies.Count < 2)
+            {
+                var newBuyer = new Companies
+                {
+                    IndustryId = industryId,
+                    CompanyName = otherCompanies.Count == 0 ? "Beta Construction Ltd." : "Gamma Trading LLC",
+                    CommercialRegNum = otherCompanies.Count == 0 ? "CR-B01" : "CR-G01",
+                    TaxRegistrationNum = otherCompanies.Count == 0 ? "TR-B01" : "TR-G01",
+                    City = otherCompanies.Count == 0 ? "Alexandria" : "Giza",
+                    AddressDetails = "Test Address",
+                    VerificationStatus = CompanyVerificationStatus.Verified,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+                db.Companies.Add(newBuyer);
+                await db.SaveChangesAsync();
+                otherCompanies.Add(newBuyer);
+            }
+
+            var buyerCompany1 = otherCompanies[0];
+            var buyerCompany2 = otherCompanies[1];
+
+            // ── جيب أو اعمل Material Category ───────────────────────────────
+            var category = await db.MaterialCategories.FirstOrDefaultAsync()
+                           ?? new Material_Categories
+                           {
+                               CategoryName = "Steel",
+                               Description = "Various steel products",
+                               UnitOfMeasure = "Ton",
+                               CreatedAt = DateTime.UtcNow
+                           };
+            if (category.Id == 0)
+            {
+                db.MaterialCategories.Add(category);
+                await db.SaveChangesAsync();
+            }
+
+            // ── جيب أو اعمل Commission Policy ───────────────────────────────
+            var policy = await db.CommissionPolicies.FirstOrDefaultAsync(p => p.Active)
+                         ?? new Commission_Policies
+                         {
+                             PolicyName = "Standard 2%",
+                             CommissionRate = 0.02m,
+                             MinAmount = 0m,
+                             MaxAmount = 9999999m,
+                             EffectiveFrom = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                             EffectiveTo = new DateTime(2030, 12, 31, 0, 0, 0, DateTimeKind.Utc),
+                             Active = true
+                         };
+            if (policy.Id == 0)
+            {
+                db.CommissionPolicies.Add(policy);
+                await db.SaveChangesAsync();
+            }
+
+            // ── جيب أو اعمل Listing ──────────────────────────────────────────
+            var listing = await db.Listings.FirstOrDefaultAsync(l => l.CompanyId == sellerCompany.Id)
+                          ?? new Listings
+                          {
+                              CompanyId = sellerCompany.Id,
+                              CategoryId = category.Id,
+                              Title = "Demo Steel Batch",
+                              Description = "Demo listing for statistics",
+                              TechnicalSpecs = "Grade A",
+                              MinOrderQuantity = 5m,
+                              AvailableQuantity = 500m,
+                              PurityPercentage = 99m,
+                              BaseCurrency = "USD",
+                              CurrentHighestBid = 850m,
+                              BidCount = 3,
+                              Status = ListingStatus.Ended,
+                              Condition = ListingCondition.New,
+                              Location = "Warehouse",
+                              StartDate = DateTime.UtcNow.AddMonths(-6),
+                              EndDate = DateTime.UtcNow.AddMonths(-5),
+                              CreatedAt = DateTime.UtcNow.AddMonths(-6),
+                              UpdatedAt = DateTime.UtcNow
+                          };
+            if (listing.Id == 0)
+            {
+                db.Listings.Add(listing);
+                await db.SaveChangesAsync();
+            }
+
+            // ── جيب الـ SuperAdmin user لوضعه في الـ bids ───────────────────
+            var superAdminUser = await userManager.FindByEmailAsync("superadmin@mazaad.com");
+            // جيب أي user موجود في الـ DB لو مفيش superadmin
+            var anyUserId = superAdminUser?.Id
+                            ?? (await db.Users.Select(u => u.Id).FirstOrDefaultAsync());
+            if (anyUserId == 0) return; // مفيش users خالص
+
+            // ── اعمل Bids ────────────────────────────────────────────────────
+            var bid = new Bids
+            {
+                ListingId = listing.Id,
+                PlacedByUserId = anyUserId,
+                BuyerCompanyId = buyerCompany1.Id,
+                BidAmountPerUnit = 850m,
+                TotalBidAmount = 850m * 200m,
+                Quantity = 200m,
+                IsAnonymous = false,
+                WinningBid = true,
+                Status = BidStatus.Won,
+                CreatedAt = DateTime.UtcNow.AddMonths(-5)
+            };
+            db.Bids.Add(bid);
+            await db.SaveChangesAsync();
+
+            // ── اعمل Orders موزعة على شهور ─────────────────────────────────
+            var now = DateTime.UtcNow;
+            var orders = new[]
+            {
+                new Orders { SellerCompanyId = sellerCompany.Id, BuyerCompanyId = buyerCompany1.Id, BidId = bid.Id, AppliedPolicyId = policy.Id, AgreedQuantity = 100m, AgreedUnitPrice = 850m, PlatformFee = 1700m,  TotalAmount = 86700m,   Status = OrderStatus.Completed, OrderDate = now.AddMonths(-5),             UpdatedAt = now },
+                new Orders { SellerCompanyId = sellerCompany.Id, BuyerCompanyId = buyerCompany2.Id, BidId = bid.Id, AppliedPolicyId = policy.Id, AgreedQuantity = 150m, AgreedUnitPrice = 820m, PlatformFee = 2460m,  TotalAmount = 125460m,  Status = OrderStatus.Completed, OrderDate = now.AddMonths(-4),             UpdatedAt = now },
+                new Orders { SellerCompanyId = sellerCompany.Id, BuyerCompanyId = buyerCompany1.Id, BidId = bid.Id, AppliedPolicyId = policy.Id, AgreedQuantity = 200m, AgreedUnitPrice = 870m, PlatformFee = 3480m,  TotalAmount = 177480m,  Status = OrderStatus.Completed, OrderDate = now.AddMonths(-3),             UpdatedAt = now },
+                new Orders { SellerCompanyId = sellerCompany.Id, BuyerCompanyId = buyerCompany2.Id, BidId = bid.Id, AppliedPolicyId = policy.Id, AgreedQuantity = 80m,  AgreedUnitPrice = 860m, PlatformFee = 1376m,  TotalAmount = 70176m,   Status = OrderStatus.Completed, OrderDate = now.AddMonths(-3).AddDays(5), UpdatedAt = now },
+                new Orders { SellerCompanyId = sellerCompany.Id, BuyerCompanyId = buyerCompany1.Id, BidId = bid.Id, AppliedPolicyId = policy.Id, AgreedQuantity = 120m, AgreedUnitPrice = 900m, PlatformFee = 2160m,  TotalAmount = 110160m,  Status = OrderStatus.Completed, OrderDate = now.AddMonths(-1),             UpdatedAt = now },
+                new Orders { SellerCompanyId = sellerCompany.Id, BuyerCompanyId = buyerCompany2.Id, BidId = bid.Id, AppliedPolicyId = policy.Id, AgreedQuantity = 90m,  AgreedUnitPrice = 920m, PlatformFee = 1656m,  TotalAmount = 84456m,   Status = OrderStatus.Pending,   OrderDate = now.AddDays(-3),              UpdatedAt = now },
+            };
+            db.Orders.AddRange(orders);
+            await db.SaveChangesAsync();
+
+            // ── اعمل Inventory Items ─────────────────────────────────────────
+            if (!await db.InventoryItems.AnyAsync(i => i.company_id == sellerCompany.Id))
+            {
+                db.InventoryItems.AddRange(
+                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Bar 12mm",  description = "High-grade construction steel bars", quantity = 500m, unit_of_measure = "Ton", minimum_auction_price = 750m, current_market_price = 900m, status = InventoryItemStatus.Available, created_at = now.AddMonths(-6), updated_at = now },
+                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Plate 5mm", description = "Flat steel plates for fabrication",  quantity = 200m, unit_of_measure = "Ton", minimum_auction_price = 800m, current_market_price = 950m, status = InventoryItemStatus.InAuction, created_at = now.AddMonths(-3), updated_at = now },
+                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Coil",      description = "Cold-rolled steel coil",            quantity = 300m, unit_of_measure = "Ton", minimum_auction_price = 700m, current_market_price = 850m, status = InventoryItemStatus.Sold,      created_at = now.AddMonths(-5), updated_at = now }
+                );
+                await db.SaveChangesAsync();
+            }
         }
     }
 }
