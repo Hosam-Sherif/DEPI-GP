@@ -28,6 +28,10 @@ namespace Mazaad.Domain.Models
         public decimal MinOrderQuantity { get; set; }
         public decimal AvailableQuantity { get; set; }
 
+        /// <summary>Unit of measure for quantity fields (e.g. kg, gm, ton, MT, L, m3)</summary>
+        [MaxLength(20)]
+        public string UnitOfMeasure { get; set; } = "kg";
+
         /// <summary>Purity / grade percentage (e.g. 99.9)</summary>
         public decimal PurityPercentage { get; set; }
 

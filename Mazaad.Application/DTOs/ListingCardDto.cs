@@ -17,6 +17,7 @@ namespace Mazaad.Application.DTOs
         public ListingStatus Status { get; set; }
         public ListingCondition Condition { get; set; }
         public string BaseCurrency { get; set; } = "USD";
+        public string UnitOfMeasure { get; set; } = "kg";
         public DateTime EndDate { get; set; }
 
         /// <summary>Seconds remaining until auction ends (negative if ended)</summary>

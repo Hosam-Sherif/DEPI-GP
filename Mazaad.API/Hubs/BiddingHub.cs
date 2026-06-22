@@ -40,10 +40,28 @@ namespace Mazaad.API.Hubs
 
         /// <summary>
         /// Client can also place a bid directly via SignalR (used by the "Place Secure Bid" button).
+        /// userId and companyId are read from the JWT token — NOT from client params.
         /// Broadcasts BidPlaced to all group members on success.
         /// </summary>
-        public async Task PlaceBid(int userId, int companyId, PlaceBidDto request)
+        public async Task PlaceBid(PlaceBidDto request)
         {
+            // Read identity from authenticated SignalR context
+            var userIdClaim = Context.User?.FindFirst("uid")?.Value
+                           ?? Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var companyIdClaim = Context.User?.FindFirst("companyId")?.Value;
+
+            if (!int.TryParse(userIdClaim, out int userId) || userId <= 0)
+            {
+                await Clients.Caller.SendAsync("BidFailed", "Invalid user token.");
+                return;
+            }
+
+            if (!int.TryParse(companyIdClaim, out int companyId) || companyId <= 0)
+            {
+                await Clients.Caller.SendAsync("BidFailed", "Only verified company members can place bids.");
+                return;
+            }
+
             var result = await _biddingService.PlaceBidAsync(userId, companyId, request);
 
             if (!result.Success)
@@ -56,8 +74,10 @@ namespace Mazaad.API.Hubs
             var liveUpdate = new LiveBidUpdateDto
             {
                 ListingId = request.ListingId,
+                BidId = result.NewBidId,
                 DisplayBidderName = result.DisplayBiddersName,
                 NewHighestBid = result.NewPrice,
+                TotalBidCount = result.NewBidCount,
                 Timestamp = System.DateTime.UtcNow
             };
 

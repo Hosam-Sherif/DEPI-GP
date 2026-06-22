@@ -215,15 +215,30 @@ namespace Mazaad.API.Hubs
         #region BIDDING
 
         /// <summary>
-        /// Place secure live bid
+        /// Place secure live bid — userId and companyId are read from the
+        /// JWT token on the SignalR connection, NOT from client params.
         /// </summary>
-        public async Task PlaceBid(
-            int userId,
-            int companyId,
-            PlaceBidDto request)
+        public async Task PlaceBid(PlaceBidDto request)
         {
             try
             {
+                // Extract identity from authenticated SignalR connection
+                var userIdClaim = Context.User?.FindFirst("uid")?.Value
+                               ?? Context.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var companyIdClaim = Context.User?.FindFirst("companyId")?.Value;
+
+                if (!int.TryParse(userIdClaim, out int userId) || userId <= 0)
+                {
+                    await Clients.Caller.SendAsync("BidRejected", new { message = "Invalid user token." });
+                    return;
+                }
+
+                if (!int.TryParse(companyIdClaim, out int companyId) || companyId <= 0)
+                {
+                    await Clients.Caller.SendAsync("BidRejected", new { message = "Only verified company members can place bids." });
+                    return;
+                }
+
                 var result =
                     await _biddingService.PlaceBidAsync(
                         userId,
@@ -245,14 +260,21 @@ namespace Mazaad.API.Hubs
                 var liveUpdate = new LiveBidUpdateDto
                 {
                     ListingId = request.ListingId,
+                    BidId = result.NewBidId,
                     DisplayBidderName = result.DisplayBiddersName,
                     NewHighestBid = result.NewPrice,
+                    TotalBidCount = result.NewBidCount,
                     Timestamp = DateTime.UtcNow
                 };
 
                 // Broadcast to all auction participants
                 await Clients
                     .Group(GetAuctionGroup(request.ListingId))
+                    .SendAsync("BidPlaced", liveUpdate);
+
+                // Also broadcast to BiddingHub group (listing-{id}) for backward compat
+                await Clients
+                    .Group($"listing-{request.ListingId}")
                     .SendAsync("BidPlaced", liveUpdate);
 
                 _logger.LogInformation(
