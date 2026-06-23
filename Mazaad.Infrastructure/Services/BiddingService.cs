@@ -118,13 +118,21 @@ namespace Mazaad.Infrastructure.Services
             if (listing == null)
                 return Fail("Listing not found.");
 
-            // Delegate to full PlaceBidAsync using the listing's minimum quantity
+            // Use the top (current winning) bid's quantity.
+            // Falls back to MinOrderQuantity if no bids have been placed yet.
+            var topBid = await _context.Bids
+                .Where(b => b.ListingId == request.ListingId && b.Status == BidStatus.Active)
+                .OrderByDescending(b => b.BidAmountPerUnit)
+                .FirstOrDefaultAsync();
+
+            var quantity = topBid?.Quantity ?? listing.MinOrderQuantity;
+
             var fullBid = new PlaceBidDto
             {
                 ListingId = request.ListingId,
                 BidAmountPerUnit = request.BidAmountPerUnit,
-                TotalBidAmount = request.BidAmountPerUnit * listing.MinOrderQuantity,
-                Quantity = listing.MinOrderQuantity,
+                TotalBidAmount = request.BidAmountPerUnit * quantity,
+                Quantity = quantity,
                 IsAnonymous = request.IsAnonymous
             };
 

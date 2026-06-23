@@ -1,924 +1,772 @@
-# Mazaad Institutional Marketplace – API Documentation
+﻿# Mazaad API — Complete Technical Documentation
 
-**Base URL:** `http://localhost:5245`  
-**Swagger UI:** `http://localhost:5245/index.html`  
-**Real-Time:** SignalR at `/hubs/bidding` and `/hubs/chat`
+> **Version:** 2.0 · **Base URL:** `http://localhost:5245` · **Format:** JSON (UTF-8) · **Last Updated:** 2026-06-22
 
 ---
 
 ## Table of Contents
-1. [Listing](#1-listing)
-2. [Bidding](#2-bidding)
-3. [Orders](#3-orders)
-4. [Notifications](#4-notifications)
-5. [Companies](#5-companies)
-6. [Industry](#6-industry)
-7. [Material Category](#7-material-category)
-8. [Chat (REST)](#8-chat-rest)
-9. [SignalR – BiddingHub](#9-signalr--biddinghub)
-10. [SignalR – ChatHub](#10-signalr--chathub)
+
+1. [Overview & Architecture](#1-overview--architecture)
+2. [Authentication & Authorization](#2-authentication--authorization)
+3. [Global Response Conventions](#3-global-response-conventions)
+4. [Auth Endpoints](#4-auth-endpoints)
+5. [Two-Factor Authentication 2FA](#5-two-factor-authentication-2fa)
+6. [Company Registration](#6-company-registration)
+7. [Companies](#7-companies)
+8. [Company Users](#8-company-users)
+9. [Listings](#9-listings)
+10. [Bidding](#10-bidding)
+11. [Chat](#11-chat)
+12. [Orders](#12-orders)
+13. [Notifications](#13-notifications)
+14. [Material Categories](#14-material-categories)
+15. [Industries](#15-industries)
+16. [Inventory](#16-inventory)
+17. [Sales Statistics](#17-sales-statistics)
+18. [Operations Dashboard](#18-operations-dashboard)
+19. [Analytics](#19-analytics)
+20. [Security Logs](#20-security-logs)
+21. [SignalR Real-Time Hubs](#21-signalr-real-time-hubs)
+22. [Enumerations Reference](#22-enumerations-reference)
+23. [Error Reference](#23-error-reference)
 
 ---
 
-## 1. Listing
+## 1. Overview & Architecture
 
-### GET `/api/listing`
-**Description:** Returns a paginated, filtered list of marketplace listing cards.  
-Used to power the **Institutional Marketplace** grid screen.
+Mazaad is a **B2B auction marketplace** for industrial raw materials. Companies list materials for timed auctions, competing companies place real-time bids, and orders are finalized from winning bids.
 
-**Query Parameters:**
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `categoryId` | int | No | Filter by material category |
-| `condition` | int | No | 0=New, 1=Certified, 2=OpenBox, 3=FixedIt |
-| `status` | int | No | 0=Upcoming, 1=Active, 2=Ended |
-| `minPrice` | decimal | No | Minimum current highest bid |
-| `maxPrice` | decimal | No | Maximum current highest bid |
-| `searchTerm` | string | No | Free-text search on Title/Description |
-| `pageNumber` | int | No | Default: 1 |
-| `pageSize` | int | No | Default: 9 |
+### Technology Stack
 
-**Response `200 OK`:**
+| Layer | Technology |
+|---|---|
+| API Framework | ASP.NET Core 8 Web API |
+| Database | SQL Server via Entity Framework Core 8 |
+| Authentication | JWT Bearer + HttpOnly Refresh Token Cookie |
+| Real-Time | ASP.NET Core SignalR (WebSockets) |
+| Identity | ASP.NET Core Identity |
+
+### Domain Model
+
+```
+Industries  --< Companies --< AspNetUsers
+Companies   --< Listings  --< Bids --> Orders
+Listings    --< Chat_Channels --< Chat_Messages
+Companies   --< InventoryItems
+Material_Categories --< Listings / InventoryItems
+```
+
+---
+
+## 2. Authentication & Authorization
+
+### Bearer Token
+
+Every protected endpoint requires:
+```
+Authorization: Bearer <accessToken>
+```
+
+### JWT Claims
+
+| Claim Key | Type | Description |
+|---|---|---|
+| `uid` | string (int) | Authenticated user ID |
+| `email` | string | User email address |
+| `companyId` | string (int) | Company ID — EMPTY for SuperAdmin |
+| `role` | string | `SuperAdmin`, `CompanyAdmin`, or `CompanyUser` |
+
+### Roles
+
+| Role | Description |
+|---|---|
+| `SuperAdmin` | Platform administrator. Manages company verification and analytics. No company. |
+| `CompanyAdmin` | Admin of a verified company. Full company access. |
+| `CompanyUser` | Employee of a verified company. Can create listings and bid. |
+
+### Token Lifecycle
+
+- **Access Token (JWT):** Short-lived (~60 min). Sent in `Authorization: Bearer` header.
+- **Refresh Token (opaque):** Long-lived (7-30 days). Stored in `HttpOnly; Secure; SameSite=Strict` cookie `refreshToken`.
+- After `change-password`: refresh token cookie deleted — user must re-login.
+
+### Authorization Summary
+
+| Action | Required |
+|---|---|
+| GET listings, bids, categories, companies (public) | None |
+| Create / Update / Delete listing | CompanyAdmin OR CompanyUser (owning company) |
+| Place bid / Quick bid | CompanyAdmin OR CompanyUser (any verified company) |
+| Cancel bid | CompanyAdmin OR CompanyUser (bid's company) |
+| Manage company users | CompanyAdmin (own company) or SuperAdmin |
+| Approve/reject companies | SuperAdmin |
+| Platform analytics / security logs (all) | SuperAdmin |
+
+---
+
+## 3. Global Response Conventions
+
+### Success Codes
+
+| Code | Meaning |
+|---|---|
+| `200 OK` | Successful request with body |
+| `201 Created` | Resource created; body contains new resource |
+| `204 No Content` | Successful, no body |
+
+### Error Codes
+
+| Code | Meaning |
+|---|---|
+| `400 Bad Request` | Validation or business rule failure |
+| `401 Unauthorized` | Missing/invalid/expired token |
+| `403 Forbidden` | Authenticated but not permitted |
+| `404 Not Found` | Resource does not exist |
+| `500 Internal Server Error` | Unhandled exception |
+
+### Error Body
+
 ```json
 {
-  "items": [
-    {
-      "id": 1,
-      "title": "Siemens Healthineers Lumina 3T MRI Suite",
-      "description": "Certified/Refurbished. Full-body 3 Tesla MRI system.",
-      "imageUrl": "https://images.unsplash.com/...",
-      "categoryName": "Medical Equipment",
-      "companyName": "Siemens Healthineers MENA",
-      "currentHighestBid": 3420000.00,
-      "bidCount": 12,
-      "status": 1,
-      "condition": 1,
-      "baseCurrency": "USD",
-      "endDate": "2026-12-31T23:59:59Z",
-      "secondsRemaining": 18234000.0
-    }
-  ],
-  "totalCount": 6,
+  "success": false,
+  "message": "Human-readable error"
+}
+```
+
+Some endpoints return: `{ "errors": ["error1", "error2"] }` for validation arrays.
+
+### Paginated Response (PagedResultDto)
+
+```json
+{
+  "items": [ ... ],
+  "totalCount": 42,
   "pageNumber": 1,
   "pageSize": 9,
-  "totalPages": 1,
-  "hasNextPage": false,
+  "totalPages": 5,
+  "hasNextPage": true,
   "hasPreviousPage": false
 }
 ```
 
 ---
 
-### GET `/api/listing/{id}`
-**Description:** Returns a summary of a single listing by ID.
+## 4. Auth Endpoints
 
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Listing ID |
-
-**Response `200 OK`:**
-```json
-{
-  "id": 1,
-  "companyId": 1,
-  "categoryId": 1,
-  "title": "Siemens Healthineers Lumina 3T MRI Suite",
-  "description": "...",
-  "minOrderQuantity": 1.0,
-  "availableQuantity": 1.0,
-  "purityPercentage": 100.0,
-  "baseCurrency": "USD",
-  "startDate": "2025-01-01T00:00:00Z",
-  "endDate": "2026-12-31T23:59:59Z",
-  "currentHighestBid": 3420000.00
-}
-```
-
-**Response `404 Not Found`:** Listing does not exist or is deleted.
+Base route: `/api/auth`
 
 ---
 
-### GET `/api/listing/{id}/detail`
-**Description:** Returns full listing detail for the **Live Bidding Room** screen.  
-Includes company name, category name, technical specs, location, due diligence docs, and the top 5 bids.
+### 4.1 Register User
 
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Listing ID |
+**`POST /api/auth/register`** | Auth: None
+
+**Request Body:**
+```json
+{
+  "fullName": "John Doe",
+  "email": "john@example.com",
+  "password": "Password@123",
+  "confirmPassword": "Password@123",
+  "jobTitle": "Procurement Manager",
+  "companyId": null
+}
+```
+
+| Field | Type | Required | Validation |
+|---|---|---|---|
+| `fullName` | string | YES | Max 200 chars |
+| `email` | string | YES | Valid email, globally unique |
+| `password` | string | YES | Min 8 chars, uppercase, digit, symbol |
+| `confirmPassword` | string | YES | Must match password |
+| `jobTitle` | string | NO | Max 100 chars |
+| `companyId` | int? | NO | FK to Companies |
 
 **Response `200 OK`:**
 ```json
 {
-  "id": 1,
-  "companyId": 1,
-  "companyName": "Siemens Healthineers MENA",
-  "categoryId": 1,
-  "categoryName": "Medical Equipment",
-  "title": "Siemens Healthineers Lumina 3T MRI Suite",
-  "description": "Deutsche Klinik Regional Distribution Center...",
-  "technicalSpecs": "{\"FieldStrength\":\"3 Tesla\",\"BoreSize\":\"70 cm\",\"ManufactureDate\":\"October 2021\"}",
-  "minOrderQuantity": 1.0,
-  "availableQuantity": 1.0,
-  "purityPercentage": 100.0,
+  "accessToken": "eyJhbGci...",
+  "accessTokenExpiry": "2026-06-22T21:35:00Z",
+  "user": {
+    "id": 10,
+    "fullName": "John Doe",
+    "email": "john@example.com",
+    "companyId": null,
+    "roles": [],
+    "twoFactorEnabled": false
+  }
+}
+```
+
+Sets cookie: `refreshToken` (HttpOnly, Secure, SameSite=Strict)
+
+**Errors:** `400` — Email taken / passwords mismatch / weak password
+
+---
+
+### 4.2 Login
+
+**`POST /api/auth/login`** | Auth: None
+
+**Request Body:**
+```json
+{
+  "email": "testadmin@amino.com",
+  "password": "Test@12345",
+  "rememberMe": false
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `email` | string | YES | |
+| `password` | string | YES | |
+| `rememberMe` | boolean | NO | true = 30-day refresh token (default 7 days) |
+
+**Response `200 OK` — Success:**
+```json
+{
+  "accessToken": "eyJhbGci...",
+  "accessTokenExpiry": "2026-06-22T21:35:00Z",
+  "user": {
+    "id": 8,
+    "fullName": "Test Company Admin",
+    "email": "testadmin@amino.com",
+    "companyId": 4,
+    "roles": ["CompanyAdmin"],
+    "twoFactorEnabled": false
+  }
+}
+```
+
+**Response `200 OK` — 2FA Required (no token issued):**
+```json
+{
+  "requiresTwoFactor": true,
+  "email": "testadmin@amino.com"
+}
+```
+Proceed to `POST /api/2fa/verify`.
+
+**Errors:** `400` — Wrong password / user not found / account deactivated
+
+---
+
+### 4.3 Refresh Token
+
+**`POST /api/auth/refresh-token`** | Auth: `refreshToken` cookie
+
+**Response `200 OK`:** `{ "accessToken": "...", "accessTokenExpiry": "...", "user": { ... } }`
+
+Sets new cookie; old refresh token is revoked.
+
+**Errors:** `401` — Cookie missing / expired / revoked
+
+---
+
+### 4.4 Logout
+
+**`POST /api/auth/logout`** | Auth: None required
+
+**Response `204 No Content`**
+
+Revokes refresh token + clears cookie.
+
+---
+
+### 4.5 Change Password
+
+**`POST /api/auth/change-password`** | Auth: Bearer
+
+**Request Body:**
+```json
+{
+  "currentPassword": "OldPass@123",
+  "newPassword": "NewPass@456",
+  "confirmNewPassword": "NewPass@456"
+}
+```
+
+**Response `204 No Content`** — Refresh token cookie deleted after success.
+
+**Errors:** `400` — Wrong current password / mismatch / weak new password | `401` — No token
+
+---
+
+## 5. Two-Factor Authentication 2FA
+
+Base route: `/api/2fa` — All require Bearer unless noted.
+
+---
+
+### 5.1 Get Setup Info (QR Code)
+
+**`GET /api/2fa/setup`** | Auth: Bearer
+
+**Response `200 OK`:**
+```json
+{
+  "qrCodeBase64": "data:image/png;base64,iVBORw0...",
+  "manualEntryKey": "JBSWY3DPEHPK3PXP"
+}
+```
+
+Scan QR with Google Authenticator or Authy.
+
+---
+
+### 5.2 Enable 2FA
+
+**`POST /api/2fa/enable`** | Auth: Bearer
+
+**Request Body:** `{ "code": "123456" }`
+
+**Response `200 OK`:** `{ "message": "Two-factor authentication enabled successfully." }`
+
+**Errors:** `400` — Invalid/expired TOTP code
+
+---
+
+### 5.3 Disable 2FA
+
+**`POST /api/2fa/disable`** | Auth: Bearer
+
+**Request Body:** `{ "code": "123456" }`
+
+**Response `200 OK`:** `{ "message": "Two-factor authentication disabled." }`
+
+---
+
+### 5.4 Verify 2FA (Step 2 Login)
+
+**`POST /api/2fa/verify`** | Auth: **None** (AllowAnonymous)
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+**Response `200 OK`:** Same as Login success — returns accessToken + user.
+
+**Errors:** `400` — Invalid code / 2FA not enabled / user not found
+
+---
+
+## 6. Company Registration
+
+Base route: `/api/companies`
+
+---
+
+### 6.1 Register Company
+
+**`POST /api/companies/register`** | Auth: None | Content-Type: `multipart/form-data`
+
+**Form Fields:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `IndustryId` | int | YES | FK to Industries |
+| `CompanyName` | string | YES | Legal company name |
+| `CommercialRegNum` | string | YES | Registration number |
+| `TaxRegistrationNum` | string | YES | Tax ID |
+| `City` | string | YES | City |
+| `AddressDetails` | string | YES | Full address |
+| `CommercialRegisterDocument` | file | YES | PDF/image, max 10 MB |
+| `TaxCardDocument` | file | YES | PDF/image, max 10 MB |
+| `AdminFullName` | string | YES | Admin full name |
+| `AdminEmail` | string | YES | Must be unique |
+| `AdminPassword` | string | YES | Min 8 chars, uppercase, digit, symbol |
+| `ConfirmPassword` | string | YES | Must match AdminPassword |
+| `AdminJobTitle` | string | NO | Admin job title |
+
+**Response `201 Created`:**
+```json
+{
+  "message": "Company registered successfully. Pending admin verification.",
+  "accessToken": "eyJhbGci...",
+  "accessTokenExpiry": "...",
+  "user": {
+    "id": 11, "fullName": "Khalid Hassan", "email": "khalid@delta.com",
+    "companyId": 6, "roles": ["CompanyAdmin"], "twoFactorEnabled": false
+  }
+}
+```
+
+Company has `isVerified = false` until SuperAdmin approves.
+
+**Errors:** `400` — Email taken / weak password | `400` — Invalid IndustryId
+
+---
+
+### 6.2 Get Pending Companies
+
+**`GET /api/companies/pending`** | Auth: SuperAdmin
+
+**Response `200 OK`:** Array of `CompanyResponseDto`
+```json
+[
+  {
+    "id": 5, "industryId": 1, "industryName": "Manufacturing",
+    "companyName": "Beta Copper LLC", "commercialRegNum": "CR-BETA-001",
+    "taxRegistrationNum": "TAX-BETA-001", "city": "Alexandria",
+    "addressDetails": "12 Industrial District", "isVerified": false,
+    "createdAt": "2026-06-21T10:05:23Z"
+  }
+]
+```
+
+---
+
+### 6.3 Verify or Reject Company
+
+**`PATCH /api/companies/{id}/verify`** | Auth: SuperAdmin
+
+**Request Body:**
+```json
+{
+  "isApproved": true,
+  "rejectionReason": ""
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `isApproved` | boolean | YES | true=approve, false=reject |
+| `rejectionReason` | string | Conditional | Required when isApproved=false |
+
+**Response `204 No Content`**
+
+**Errors:** `400` — Missing rejection reason | `404` — Company not found
+
+---
+
+### 6.4 Get Company Documents
+
+**`GET /api/companies/{id}/documents`** | Auth: SuperAdmin
+
+**Response `200 OK`:** Array of document metadata
+```json
+[
+  {
+    "id": 1, "documentType": "CommercialRegisterDocument",
+    "fileName": "commercial_reg.pdf", "uploadedAt": "2026-06-21T10:10:00Z"
+  }
+]
+```
+
+---
+
+### 6.5 Download Document
+
+**`GET /api/companies/documents/{documentId}/download`** | Auth: SuperAdmin
+
+**Response `200 OK`:** Raw file stream (`Content-Disposition: attachment`)
+
+**Errors:** `404` — Document not found
+
+---
+
+## 7. Companies
+
+Base route: `/api/Companies`
+
+---
+
+### 7.1 Get All Companies
+
+**`GET /api/Companies`** | Auth: None
+
+**Response `200 OK`:** Array of CompanyResponseDto
+```json
+[
+  {
+    "id": 4, "industryId": 1, "industryName": "Manufacturing",
+    "companyName": "Amino", "commercialRegNum": "Amino",
+    "taxRegistrationNum": "Amino", "city": "Girga",
+    "addressDetails": "Girga", "isVerified": true,
+    "createdAt": "2026-06-21T22:14:40Z"
+  }
+]
+```
+
+---
+
+### 7.2 Get Company by ID
+
+**`GET /api/Companies/{id}`** | Auth: None
+
+**Response `200 OK`:** Single CompanyResponseDto
+
+**Errors:** `404` — Not found
+
+---
+
+### 7.3 Quick Verify Company
+
+**`PATCH /api/Companies/{id}/verifyy`** | Auth: Bearer
+
+No request body. Sets `isVerified = true` immediately.
+
+**Response `204 No Content`**
+
+---
+
+## 8. Company Users
+
+Base route: `/api/companies/{companyId}/users`
+
+CompanyAdmin can only access their own company. SuperAdmin can access any.
+
+---
+
+### 8.1 Get Company Users
+
+**`GET /api/companies/{companyId}/users`** | Auth: Bearer
+
+**Response `200 OK`:**
+```json
+[
+  {
+    "id": 8, "fullName": "Test Company Admin", "email": "testadmin@amino.com",
+    "jobTitle": "Test Admin", "roles": ["CompanyAdmin"], "isActive": true,
+    "twoFactorEnabled": false, "lastLoginDate": "2026-06-22T16:53:24Z",
+    "createdAt": "2026-06-22T16:44:57Z"
+  },
+  {
+    "id": 9, "fullName": "Bidder User", "email": "bidder@amino.com",
+    "jobTitle": "Procurement Officer", "roles": ["CompanyUser"], "isActive": true,
+    "twoFactorEnabled": false, "lastLoginDate": null,
+    "createdAt": "2026-06-22T20:31:00Z"
+  }
+]
+```
+
+**Errors:** `403` — Caller not in this company (not SuperAdmin)
+
+---
+
+### 8.2 Get Company User by ID
+
+**`GET /api/companies/{companyId}/users/{userId}`** | Auth: Bearer
+
+**Response `200 OK`:** Single user object
+
+**Errors:** `404` — `{ "message": "User not found in this company." }`
+
+---
+
+### 8.3 Add User to Company
+
+**`POST /api/companies/{companyId}/users`** | Auth: CompanyAdmin or SuperAdmin
+
+**Request Body:**
+```json
+{
+  "fullName": "Sara Ahmed",
+  "email": "sara@amino.com",
+  "password": "Password@123",
+  "confirmPassword": "Password@123",
+  "jobTitle": "Sales Manager",
+  "role": "CompanyUser"
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `fullName` | string | YES | |
+| `email` | string | YES | Globally unique |
+| `password` | string | YES | Complexity rules apply |
+| `confirmPassword` | string | YES | Must match |
+| `jobTitle` | string | NO | |
+| `role` | string | YES | "CompanyAdmin" or "CompanyUser" |
+
+**Response `201 Created`:** New user object
+
+**Errors:** `400` — Email taken / mismatch / weak password | `403` — Not CompanyAdmin | `404` — Company not found
+
+---
+
+### 8.4 Update Company User
+
+**`PATCH /api/companies/{companyId}/users/{userId}`** | Auth: CompanyAdmin or SuperAdmin
+
+**Request Body (optional fields):**
+```json
+{ "role": "CompanyAdmin", "isActive": true }
+```
+
+**Response `204 No Content`**
+
+---
+
+### 8.5 Remove User from Company
+
+**`DELETE /api/companies/{companyId}/users/{userId}`** | Auth: CompanyAdmin or SuperAdmin
+
+**Response `204 No Content`**
+
+---
+
+## 9. Listings
+
+Base route: `/api/Listing`
+
+> **UnitOfMeasure Rule:** Auto-inherited from MaterialCategory. CategoryId 1 (Steel) => "Ton". Any value sent in body is IGNORED.
+
+---
+
+### 9.1 Get All Listings (Marketplace Grid)
+
+**`GET /api/Listing`** | Auth: None
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `PageNumber` | int | 1 | |
+| `PageSize` | int | 9 | |
+| `CategoryId` | int? | — | Filter by category |
+| `Condition` | int? | — | 0=New, 1=Used, 2=Refurbished |
+| `Status` | int? | — | 0=Upcoming, 1=Active, 2=Closed, 3=Sold |
+| `MinPrice` | decimal? | — | Min current highest bid |
+| `MaxPrice` | decimal? | — | Max current highest bid |
+| `SearchTerm` | string? | — | Search title and description |
+
+**Response `200 OK` — PagedResultDto of ListingCardDto:**
+```json
+{
+  "items": [
+    {
+      "id": 7, "title": "Premium Steel Coils — Grade A",
+      "description": "High-purity cold-rolled steel coils...",
+      "imageUrl": "", "categoryName": "Steel", "companyName": "Amino",
+      "currentHighestBid": 310.00, "bidCount": 3, "status": 1, "condition": 0,
+      "baseCurrency": "USD", "unitOfMeasure": "Ton",
+      "endDate": "2026-12-31T00:00:00Z", "secondsRemaining": 15724800.0
+    }
+  ],
+  "totalCount": 7, "pageNumber": 1, "pageSize": 9,
+  "totalPages": 1, "hasNextPage": false, "hasPreviousPage": false
+}
+```
+
+---
+
+### 9.2 Get Listing by ID
+
+**`GET /api/Listing/{id}`** | Auth: None
+
+**Response `200 OK` — ListingResponseDto:**
+```json
+{
+  "id": 7, "companyId": 4, "categoryId": 1,
+  "title": "Premium Steel Coils — Grade A",
+  "description": "High-purity cold-rolled steel coils...",
+  "minOrderQuantity": 5.0, "availableQuantity": 200.0,
+  "unitOfMeasure": "Ton", "purityPercentage": 99.5,
   "baseCurrency": "USD",
-  "currentHighestBid": 3420000.00,
-  "bidCount": 12,
-  "status": 1,
-  "condition": 1,
-  "imageUrl": "https://images.unsplash.com/...",
-  "location": "Industrial Park West, Gate 12, Munich 80331, DE",
-  "dueDiligenceUrls": "inspection_report.pdf,maintenance_log.pdf,terms_of_sale.pdf",
-  "startDate": "2025-01-01T00:00:00Z",
-  "endDate": "2026-12-31T23:59:59Z",
+  "startDate": "2026-07-01T10:00:00Z", "endDate": "2026-09-30T18:00:00Z",
+  "currentHighestBid": 310.00
+}
+```
+
+**Errors:** `404` — Not found or soft-deleted
+
+---
+
+### 9.3 Get Listing Detail (Full Bidding Room)
+
+**`GET /api/Listing/{id}/detail`** | Auth: None
+
+**Response `200 OK` — ListingDetailDto:**
+```json
+{
+  "id": 7, "companyId": 4, "companyName": "Amino",
+  "categoryId": 1, "categoryName": "Steel",
+  "title": "Premium Steel Coils — Grade A",
+  "description": "High-purity cold-rolled steel coils...",
+  "technicalSpecs": "", "minOrderQuantity": 5.0, "availableQuantity": 200.0,
+  "unitOfMeasure": "Ton", "purityPercentage": 99.5, "baseCurrency": "USD",
+  "currentHighestBid": 310.00, "bidCount": 3, "status": 1, "condition": 0,
+  "imageUrl": "", "location": "", "dueDiligenceUrls": "",
+  "startDate": "2026-07-01T10:00:00Z", "endDate": "2026-12-31T00:00:00Z",
   "topBids": [
     {
-      "id": 3,
-      "listingId": 1,
-      "buyerCompanyId": 2,
-      "displayBidderName": "Gulf Heavy Equipment LLC",
-      "bidAmountPerUnit": 3420000.00,
-      "totalBidAmount": 3420000.00,
-      "quantity": 1.0,
-      "isAnonymous": false,
-      "status": 2,
-      "createdAt": "2026-05-02T14:00:00Z"
+      "id": 8, "listingId": 7, "buyerCompanyId": 4,
+      "displayBidderName": "Amino", "bidAmountPerUnit": 310.00,
+      "totalBidAmount": 3100.00, "quantity": 10.0,
+      "isAnonymous": false, "status": 1, "createdAt": "2026-06-22T20:40:35Z"
     }
   ]
 }
 ```
 
-**Response `404 Not Found`:** Listing does not exist.
-
 ---
 
-### POST `/api/listing`
-**Description:** Creates a new auction listing. The seller company ID is taken from the authenticated user (currently hardcoded to `1` for testing).
+### 9.4 Create Listing
+
+**`POST /api/Listing`** | Auth: Bearer — CompanyAdmin or CompanyUser
 
 **Request Body:**
 ```json
 {
   "categoryId": 1,
-  "title": "New Industrial Asset",
-  "description": "Detailed description of the asset",
-  "minOrderQuantity": 1,
-  "availableQuantity": 5,
+  "title": "Premium Steel Coils — Grade A",
+  "description": "High-purity cold-rolled steel coils. 200 Ton available.",
+  "minOrderQuantity": 5,
+  "availableQuantity": 200,
   "purityPercentage": 99.5,
   "baseCurrency": "USD",
-  "startDate": "2026-06-01T00:00:00Z",
-  "endDate": "2026-07-01T00:00:00Z",
-  "startingPrice": 50000
+  "startDate": "2026-07-01T10:00:00Z",
+  "endDate": "2026-09-30T18:00:00Z",
+  "startingPrice": 750.00
 }
 ```
 
-**Response `201 Created`:** Returns the created listing summary.
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `categoryId` | int | YES | Determines unitOfMeasure automatically |
+| `title` | string | YES | Max 200 chars |
+| `description` | string | YES | |
+| `minOrderQuantity` | decimal | YES | Min units per bid |
+| `availableQuantity` | decimal | YES | Total units offered |
+| `purityPercentage` | decimal | NO | Grade/purity 0-100 |
+| `baseCurrency` | string | YES | ISO code e.g. "USD" |
+| `startDate` | datetime | YES | ISO 8601 UTC |
+| `endDate` | datetime | YES | ISO 8601 UTC |
+| `startingPrice` | decimal | YES | Floor bid price per unit |
+| `unitOfMeasure` | string? | NO | IGNORED — auto-set from category |
+
+**Response `201 Created`:** ListingResponseDto (includes auto-assigned unitOfMeasure)
+
+**Errors:** `401` — No companyId in JWT | `404` — Invalid categoryId
 
 ---
 
-### PUT `/api/listing/{id}`
-**Description:** Updates a listing's mutable fields. Only the owning company can update.
+### 9.5 Update Listing
 
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Listing ID |
+**`PUT /api/Listing/{id}`** | Auth: Bearer — CompanyAdmin or CompanyUser (owning company)
 
-**Request Body:** Same as `POST /api/listing`
+**Request Body:** Same as Create Listing
 
-**Response `200 OK`:** Returns updated listing summary.  
-**Response `404 Not Found`:** Listing not found or caller doesn't own it.
+**Response `200 OK`:** Updated ListingResponseDto
+
+**Errors:** `401` — No companyId | `404` — Not found or not owned by caller's company
 
 ---
 
-### DELETE `/api/listing/{id}`
-**Description:** Soft-deletes a listing (sets `IsDeleted = true`). Only the owning company can delete.
+### 9.6 Delete Listing (Soft Delete)
 
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Listing ID |
+**`DELETE /api/Listing/{id}`** | Auth: Bearer — CompanyAdmin or CompanyUser (owning company)
 
-**Response `204 No Content`:** Deleted successfully.  
-**Response `400 Bad Request`:** Listing not found or not owned by caller.
+Sets IsDeleted=true. Does not appear in GET responses.
 
----
+**Response `204 No Content`**
 
-## 2. Bidding
-
-### POST `/api/bidding/place-bid`
-**Description:** Places a full bid from the **Live Bidding Room** execution panel.  
-Validates auction is active, quantity is within bounds, and bid exceeds current price.  
-Marks all previous active bids as `Outbid`, increments `BidCount` on the listing.  
-Sends "You've been outbid" notifications to displaced bidders.  
-Broadcasts `BidPlaced` event via SignalR to all clients watching that listing.
-
-**Request Body:**
-```json
-{
-  "listingId": 2,
-  "bidAmountPerUnit": 290000,
-  "totalBidAmount": 290000,
-  "quantity": 1,
-  "isAnonymous": false
-}
-```
-
-**Response `200 OK`:**
-```json
-{
-  "success": true,
-  "message": "Bid placed successfully.",
-  "displayBiddersName": "Gulf Heavy Equipment LLC",
-  "newPrice": 290000.00,
-  "newBidId": 7,
-  "newBidCount": 9
-}
-```
-
-**Response `400 Bad Request`:**
-```json
-{
-  "success": false,
-  "message": "Your bid must exceed the current highest bid.",
-  "displayBiddersName": "",
-  "newPrice": 0,
-  "newBidId": 0,
-  "newBidCount": 0
-}
-```
-
-**Validation Rules:**
-- Auction `EndDate` must be in the future
-- `Quantity` ≥ `MinOrderQuantity` and ≤ `AvailableQuantity`
-- `BidAmountPerUnit` > `CurrentHighestBid`
+**Errors:** `400` — Not found or not owned | `401` — No companyId
 
 ---
-
-### POST `/api/bidding/quick-bid`
-**Description:** One-click bid from a **Marketplace card** "Quick Bid" button.  
-Automatically uses the listing's `MinOrderQuantity` — caller only provides the price.  
-Also broadcasts `BidPlaced` via SignalR.
-
-**Request Body:**
-```json
-{
-  "listingId": 3,
-  "bidAmountPerUnit": 1250000,
-  "isAnonymous": false
-}
-```
-
-**Response `200 OK`:** Same format as `place-bid`.  
-**Response `400 Bad Request`:** Same validation errors as `place-bid`.
-
----
-
-### GET `/api/bidding/listing/{listingId}`
-**Description:** Returns all bids for a listing ordered by amount descending (basic summary view).
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `listingId` | int | Listing ID |
-
-**Response `200 OK`:**
-```json
-[
-  {
-    "success": true,
-    "message": "Bid retrieved",
-    "displayBiddersName": "Gulf Heavy Equipment LLC",
-    "newPrice": 290000.00,
-    "newBidId": 7,
-    "newBidCount": 0
-  }
-]
-```
-
----
-
-### GET `/api/bidding/listing/{listingId}/live`
-**Description:** Returns the top 10 bids with full detail for the **Live Bidding Feed** panel.  
-Used to initialize the SignalR client state when a user opens the bidding room.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `listingId` | int | Listing ID |
-
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": 7,
-    "listingId": 2,
-    "buyerCompanyId": 2,
-    "displayBidderName": "Gulf Heavy Equipment LLC",
-    "bidAmountPerUnit": 290000.00,
-    "totalBidAmount": 290000.00,
-    "quantity": 1.0,
-    "isAnonymous": false,
-    "status": 2,
-    "createdAt": "2026-05-02T15:30:00Z"
-  }
-]
-```
-
-**Bid Status Values:**
-| Value | Name | Description |
-|-------|------|-------------|
-| 0 | Active | Currently the leading bid |
-| 1 | Outbid | A higher bid was placed |
-| 2 | Winning | Auction ended, this bid won |
-| 3 | Won | Converted to an order |
-| 4 | Cancelled | Cancelled by the bidder |
-
----
-
-### GET `/api/bidding/{id}`
-**Description:** Returns the full detail of a single bid.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Bid ID |
-
-**Response `200 OK`:** Same format as single item in `/live` response.  
-**Response `404 Not Found`:** Bid does not exist.
-
----
-
-### DELETE `/api/bidding/{id}`
-**Description:** Cancels a bid (sets `Status = Cancelled`). Only the bidding company can cancel their own bid.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Bid ID |
-
-**Response `204 No Content`:** Cancelled successfully.  
-**Response `400 Bad Request`:** Bid not found or not owned by caller.
-
----
-
-## 3. Orders
-
-### GET `/api/orders`
-**Description:** Returns all orders where the current company is the buyer **or** the seller. Ordered by most recent first.
-
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": 1,
-    "bidId": 5,
-    "sellerCompanyId": 1,
-    "sellerCompanyName": "Siemens Healthineers MENA",
-    "buyerCompanyId": 2,
-    "buyerCompanyName": "Gulf Heavy Equipment LLC",
-    "agreedQuantity": 1.0,
-    "agreedUnitPrice": 3420000.00,
-    "platformFee": 85500.00,
-    "totalAmount": 3420000.00,
-    "status": 1,
-    "notes": "",
-    "orderDate": "2026-05-02T16:00:00Z"
-  }
-]
-```
-
-**Order Status Values:**
-| Value | Name |
-|-------|------|
-| 0 | Pending |
-| 1 | Confirmed |
-| 2 | Completed |
-| 3 | Cancelled |
-
----
-
-### GET `/api/orders/{id}`
-**Description:** Returns a single order by ID.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Order ID |
-
-**Response `200 OK`:** Same format as single item above.  
-**Response `404 Not Found`:** Order does not exist.
-
----
-
-### POST `/api/orders/finalize`
-**Description:** Converts a winning bid into a formal order.  
-Automatically applies the active commission policy to calculate `PlatformFee`.  
-Marks the bid as `Won` and sends a "Congratulations" notification to the buyer.  
-Can only be called after the auction `EndDate` has passed.
-
-**Request Body:**
-```json
-{
-  "bidId": 5,
-  "notes": "Delivery to be arranged within 30 days."
-}
-```
-
-**Response `201 Created`:** Returns the created order (same format as GET).
-
-**Response `400 Bad Request`:**
-```json
-"Auction has not ended yet."
-```
-or
-```json
-"No active commission policy found."
-```
-
-**Response `403 Forbidden`:** Caller does not own the listing.
-
----
-
-### PATCH `/api/orders/{id}/status`
-**Description:** Updates the status of an order. Both buyer and seller can update.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Order ID |
-
-**Request Body:**
-```json
-2
-```
-*(Integer representing `OrderStatus` enum: 0=Pending, 1=Confirmed, 2=Completed, 3=Cancelled)*
-
-**Response `204 No Content`:** Updated successfully.  
-**Response `400 Bad Request`:** Order not found or caller is not buyer/seller.
-
----
-
-## 4. Notifications
-
-### GET `/api/notifications`
-**Description:** Returns all notifications for the current user, ordered by most recent first.  
-Notifications are created automatically when: a bid is outbid, or an order is confirmed.
-
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": 1,
-    "userId": 1,
-    "title": "You've been outbid",
-    "message": "Your bid on 'Siemens Healthineers Lumina 3T MRI Suite' has been outbid. New price: $3,420,000.00",
-    "isRead": false,
-    "referenceType": "Listing",
-    "referenceId": 1,
-    "createdAt": "2026-05-02T15:00:00Z"
-  }
-]
-```
-
----
-
-### GET `/api/notifications/unread-count`
-**Description:** Returns the count of unread notifications. Used to display the badge on the notification bell icon.
-
-**Response `200 OK`:**
-```json
-{
-  "unreadCount": 3
-}
-```
-
----
-
-### PUT `/api/notifications/{id}/read`
-**Description:** Marks a single notification as read.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Notification ID |
-
-**Response `204 No Content`:** Marked as read.  
-**Response `404 Not Found`:** Notification not found or doesn't belong to current user.
-
----
-
-### PUT `/api/notifications/read-all`
-**Description:** Marks all of the current user's notifications as read (bulk operation).
-
-**Response `204 No Content`:** All marked as read.
-
----
-
-## 5. Companies
-
-### GET `/api/companies`
-**Description:** Returns all registered companies with their industry name.
-
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": 1,
-    "industryId": 1,
-    "industryName": "Medical Devices",
-    "companyName": "Siemens Healthineers MENA",
-    "commercialRegNum": "CR-001-2025",
-    "taxRegistrationNum": "TRN-001-2025",
-    "city": "Munich",
-    "addressDetails": "Industrial Park West, Gate 12, Munich 80331, DE",
-    "isVerified": true,
-    "createdAt": "2025-01-01T00:00:00Z"
-  }
-]
-```
-
----
-
-### GET `/api/companies/{id}`
-**Description:** Returns a single company by ID.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Company ID |
-
-**Response `200 OK`:** Same format as single item above.  
-**Response `404 Not Found`:** Company does not exist.
-
----
-
-### POST `/api/companies`
-**Description:** Registers a new company. The company starts as unverified (`isVerified = false`).
-
-**Request Body:**
-```json
-{
-  "industryId": 2,
-  "companyName": "New Machinery Co.",
-  "commercialRegNum": "CR-010-2026",
-  "taxRegistrationNum": "TRN-010-2026",
-  "city": "Cairo",
-  "addressDetails": "10 Industrial Zone, Cairo, Egypt"
-}
-```
-
-**Response `201 Created`:** Returns the created company with `isVerified = false`.
-
----
-
-### PATCH `/api/companies/{id}/verify`
-**Description:** Marks a company as verified (admin action). Sets `IsVerified = true`.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Company ID |
-
-**Response `204 No Content`:** Verified successfully.  
-**Response `404 Not Found`:** Company does not exist.
-
----
-
-## 6. Industry
-
-### GET `/api/industry`
-**Description:** Returns all active industry types. Used to populate the **Industrial Sectors** filter panel in the marketplace.
-
-**Response `200 OK`:**
-```json
-[
-  { "id": 1, "industryName": "Medical Devices",  "createdAt": "2025-01-01T00:00:00Z" },
-  { "id": 2, "industryName": "Heavy Machinery",  "createdAt": "2025-01-01T00:00:00Z" },
-  { "id": 3, "industryName": "Data Centers",     "createdAt": "2025-01-01T00:00:00Z" },
-  { "id": 4, "industryName": "Real Estate",      "createdAt": "2025-01-01T00:00:00Z" },
-  { "id": 5, "industryName": "Robotics",         "createdAt": "2025-01-01T00:00:00Z" }
-]
-```
-
----
-
-### GET `/api/industry/{id}`
-**Description:** Returns a single industry type by ID.
-
-**Response `200 OK`:** Single item same format as above.  
-**Response `404 Not Found`:** Industry does not exist or is deleted.
-
----
-
-### POST `/api/industry`
-**Description:** Creates a new industry type.
-
-**Request Body:**
-```json
-{
-  "industryName": "Aerospace"
-}
-```
-
-**Response `201 Created`:** Returns the created industry type.
-
----
-
-### DELETE `/api/industry/{id}`
-**Description:** Soft-deletes an industry type (`IsDeleted = true`). It will no longer appear in GET results.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `id` | int | Industry ID |
-
-**Response `204 No Content`:** Deleted successfully.  
-**Response `404 Not Found`:** Industry does not exist.
-
----
-
-## 7. Material Category
-
-### GET `/api/materialcategory`
-**Description:** Returns all material categories. Used as filter options and when creating a listing.
-
-**Response `200 OK`:**
-```json
-[
-  { "id": 1, "categoryName": "Medical Equipment",      "description": "Diagnostic and therapeutic medical devices", "unitOfMeasure": "Unit" },
-  { "id": 2, "categoryName": "Construction Machinery", "description": "Heavy construction equipment",               "unitOfMeasure": "Unit" },
-  { "id": 3, "categoryName": "IT Infrastructure",      "description": "Servers, networking and cooling",            "unitOfMeasure": "Unit" },
-  { "id": 4, "categoryName": "Fleet Vehicles",         "description": "Commercial fleet bundles",                   "unitOfMeasure": "Fleet" },
-  { "id": 5, "categoryName": "Real Estate",            "description": "Commercial and industrial real estate",      "unitOfMeasure": "sqm" },
-  { "id": 6, "categoryName": "Industrial Robots",      "description": "Robotic arms and production lines",         "unitOfMeasure": "Unit" }
-]
-```
-
----
-
-### GET `/api/materialcategory/{id}`
-**Description:** Returns a single category by ID.
-
-**Response `200 OK`:** Single item same format.  
-**Response `404 Not Found`:** Category does not exist.
-
----
-
-### POST `/api/materialcategory`
-**Description:** Creates a new material category.
-
-**Request Body:**
-```json
-{
-  "categoryName": "Renewable Energy",
-  "description": "Solar panels, wind turbines and energy storage",
-  "unitOfMeasure": "MW"
-}
-```
-
-**Response `201 Created`:** Returns the created category.
-
----
-
-### DELETE `/api/materialcategory/{id}`
-**Description:** Permanently deletes a category.
-
-**Response `204 No Content`:** Deleted successfully.  
-**Response `400 Bad Request`:** Category not found.
-
----
-
-## 8. Chat (REST)
-
-### POST `/api/chat/start`
-**Description:** Creates or retrieves an existing chat channel between a buyer and seller for a specific listing.  
-If a channel already exists for this listing + buyer combination, it returns the existing channel ID.
-
-**Query Parameters:**
-| Param | Type | Required | Description |
-|-------|------|----------|-------------|
-| `listingId` | int | Yes | The listing being discussed |
-| `buyerCompanyId` | int | Yes | The buyer's company ID |
-| `sellerCompanyId` | int | Yes | The seller's company ID |
-
-**Response `200 OK`:**
-```json
-{
-  "channelId": 3
-}
-```
-
----
-
-### GET `/api/chat/{channelId}/history`
-**Description:** Returns the full message history for a channel, ordered by oldest first.
-
-**Path Parameters:**
-| Param | Type | Description |
-|-------|------|-------------|
-| `channelId` | int | Chat channel ID |
-
-**Response `200 OK`:**
-```json
-[
-  {
-    "id": 1,
-    "channelId": 3,
-    "senderUserId": 1,
-    "messageText": "Is the MRI unit still available for Q3 delivery?",
-    "sentAt": "2026-05-02T10:00:00Z"
-  },
-  {
-    "id": 2,
-    "channelId": 3,
-    "senderUserId": 2,
-    "messageText": "Yes, we can arrange Q3 delivery. Please confirm the bid.",
-    "sentAt": "2026-05-02T10:05:00Z"
-  }
-]
-```
-
----
-
-## 9. SignalR – BiddingHub
-
-**Connection URL:** `ws://localhost:5245/hubs/bidding`
-
-The BiddingHub enables real-time bid updates for the **Live Bidding Room** screen.  
-Connect using the SignalR client library (`@microsoft/signalr`).
-
-### Client → Server Methods
-
-#### `JoinAuction(listingId: number)`
-**Description:** Subscribe to live updates for a specific listing. Call this when the user opens the bidding room.  
-The server immediately pushes the current top bids back to the caller via `InitialBidState`.
-
-```javascript
-connection.invoke("JoinAuction", 1);
-```
-
----
-
-#### `LeaveAuction(listingId: number)`
-**Description:** Unsubscribe from a listing's updates. Call this when the user navigates away.
-
-```javascript
-connection.invoke("LeaveAuction", 1);
-```
-
----
-
-#### `PlaceBid(userId, companyId, request)`
-**Description:** Place a bid directly via SignalR (alternative to the REST endpoint).  
-On success, broadcasts `BidPlaced` to the entire auction room group.  
-On failure, sends `BidFailed` only to the caller.
-
-```javascript
-connection.invoke("PlaceBid", 1, 2, {
-  listingId: 1,
-  bidAmountPerUnit: 3500000,
-  totalBidAmount: 3500000,
-  quantity: 1,
-  isAnonymous: false
-});
-```
-
----
-
-### Server → Client Events
-
-#### `InitialBidState` → `BidDetailDto[]`
-**Triggered:** Immediately after a client calls `JoinAuction`.  
-**Payload:** Array of top 10 bids (full detail) for the listing.
-
-```javascript
-connection.on("InitialBidState", (bids) => {
-  // Populate the Live Bidding Feed with current bids
-  renderBidFeed(bids);
-});
-```
-
----
-
-#### `BidPlaced` → `LiveBidUpdateDto`
-**Triggered:** When any client (REST or SignalR) successfully places a bid.  
-**Payload:**
-
-```javascript
-connection.on("BidPlaced", (update) => {
-  // update shape:
-  // {
-  //   listingId: 1,
-  //   bidId: 14,
-  //   displayBidderName: "Gulf Heavy Equipment LLC",
-  //   newHighestBid: 3500000.00,
-  //   totalBidCount: 13,
-  //   timestamp: "2026-05-02T15:00:00Z"
-  // }
-  updatePriceDisplay(update.newHighestBid);
-  addBidToFeed(update);
-});
-```
-
----
-
-#### `BidFailed` → `string`
-**Triggered:** When a `PlaceBid` call from this client fails (only sent to the caller).
-
-```javascript
-connection.on("BidFailed", (errorMessage) => {
-  showErrorToast(errorMessage);
-});
-```
-
----
-
-## 10. SignalR – ChatHub
-
-**Connection URL:** `ws://localhost:5245/hubs/chat`
-
-### Client → Server Methods
-
-#### `JoinChannel(channelId: string)`
-Subscribe to messages in a chat channel.
-
-```javascript
-connection.invoke("JoinChannel", "3");
-```
-
-#### `SendMessage(channelId, senderUserId, messageText)`
-Send a message. Saved to the database, then broadcast to all channel members.
-
-```javascript
-connection.invoke("SendMessage", 3, 1, "Hello, is the asset still available?");
-```
-
----
-
-### Server → Client Events
-
-#### `ReceiveMessage` → `MessageResponseDto`
-```javascript
-connection.on("ReceiveMessage", (message) => {
-  // {
-  //   id: 5,
-  //   channelId: 3,
-  //   senderUserId: 1,
-  //   messageText: "Hello, is the asset still available?",
-  //   sentAt: "2026-05-02T15:00:00Z"
-  // }
-  appendMessageToChat(message);
-});
-```
-
----
-
-## Enum Reference
-
-### `ListingStatus`
-| Value | Name | Description |
-|-------|------|-------------|
-| 0 | Upcoming | Auction not started yet |
-| 1 | Active | Auction is live |
-| 2 | Ended | Auction has finished |
-| 3 | Cancelled | Auction was cancelled |
-
-### `ListingCondition`
-| Value | Name | UI Label |
-|-------|------|----------|
-| 0 | New | New |
-| 1 | Certified | Certified |
-| 2 | OpenBox | Open Box |
-| 3 | FixedIt | Fixed-It |
-
-### `BidStatus`
-| Value | Name | Description |
-|-------|------|-------------|
-| 0 | Active | Currently leading bid |
-| 1 | Outbid | Superseded by higher bid |
-| 2 | Winning | Auction ended, awaiting finalization |
-| 3 | Won | Converted to an order |
-| 4 | Cancelled | Cancelled by bidder |
-
-### `OrderStatus`
-| Value | Name |
-|-------|------|
-| 0 | Pending |
-| 1 | Confirmed |
-| 2 | Completed |
-| 3 | Cancelled |
-
----
-
-## Common HTTP Status Codes
-
-| Code | Meaning |
-|------|---------|
-| `200 OK` | Request succeeded, body contains data |
-| `201 Created` | Resource created, body contains created resource |
-| `204 No Content` | Success, no body |
-| `400 Bad Request` | Invalid input or business rule violation |
-| `403 Forbidden` | Caller is not authorized to perform this action |
-| `404 Not Found` | Resource does not exist |
-| `500 Internal Server Error` | Unexpected server error |

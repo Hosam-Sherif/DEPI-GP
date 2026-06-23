@@ -37,12 +37,11 @@ namespace Mazaad.API.Controllers
         {
             try
             {
-                // Extract authenticated user
-                int userId =
-                    int.Parse(User.FindFirst("uid")!.Value);
+                if (!int.TryParse(User.FindFirst("uid")?.Value, out int userId) || userId <= 0)
+                    return Unauthorized(new { success = false, message = "Invalid user token." });
 
-                int companyId =
-                    int.Parse(User.FindFirst("companyId")!.Value);
+                if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
+                    return Unauthorized(new { success = false, message = "Only verified company users can place bids." });
 
                 var result =
                     await _biddingService.PlaceBidAsync(
@@ -72,6 +71,11 @@ namespace Mazaad.API.Controllers
 
                 await _hubContext.Clients
                     .Group($"auction-{request.ListingId}")
+                    .SendAsync("BidPlaced", liveUpdate);
+
+                // Also notify BiddingHub clients (group: listing-{id})
+                await _hubContext.Clients
+                    .Group($"listing-{request.ListingId}")
                     .SendAsync("BidPlaced", liveUpdate);
 
                 _logger.LogInformation(
@@ -112,11 +116,11 @@ namespace Mazaad.API.Controllers
         {
             try
             {
-                int userId =
-                    int.Parse(User.FindFirst("uid")!.Value);
+                if (!int.TryParse(User.FindFirst("uid")?.Value, out int userId) || userId <= 0)
+                    return Unauthorized(new { success = false, message = "Invalid user token." });
 
-                int companyId =
-                    int.Parse(User.FindFirst("companyId")!.Value);
+                if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
+                    return Unauthorized(new { success = false, message = "Only verified company users can place quick bids." });
 
                 var result =
                     await _biddingService.PlaceQuickBidAsync(
@@ -172,11 +176,11 @@ namespace Mazaad.API.Controllers
         #region GET BIDS
 
         /// <summary>
-        /// Get all bids for listing
+        /// Get all bids for listing — public, no auth required.
         /// </summary>
         [HttpGet("listing/{listingId}")]
-        public async Task<IActionResult> GetListingBids(
-            int listingId)
+        [AllowAnonymous]
+        public async Task<IActionResult> GetListingBids(int listingId)
         {
             var bids =
                 await _biddingService
@@ -186,11 +190,11 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>
-        /// Get live auction state
+        /// Get live auction state — public, no auth required.
         /// </summary>
         [HttpGet("listing/{listingId}/live")]
-        public async Task<IActionResult> GetLiveBids(
-            int listingId)
+        [AllowAnonymous]
+        public async Task<IActionResult> GetLiveBids(int listingId)
         {
             var liveBids =
                 await _biddingService
@@ -200,11 +204,11 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>
-        /// Get bid details
+        /// Get bid details — public, no auth required.
         /// </summary>
         [HttpGet("{bidId}")]
-        public async Task<IActionResult> GetBidDetails(
-            int bidId)
+        [AllowAnonymous]
+        public async Task<IActionResult> GetBidDetails(int bidId)
         {
             var bid =
                 await _biddingService
@@ -232,8 +236,8 @@ namespace Mazaad.API.Controllers
         public async Task<IActionResult> DeleteBid(
             int bidId)
         {
-            int companyId =
-                int.Parse(User.FindFirst("companyId")!.Value);
+            if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
+                return Unauthorized(new { success = false, message = "Only verified company users can cancel bids." });
 
             var success =
                 await _biddingService

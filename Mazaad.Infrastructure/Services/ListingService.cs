@@ -72,6 +72,7 @@ namespace Mazaad.Infrastructure.Services
                     Status = l.Status,
                     Condition = l.Condition,
                     BaseCurrency = l.BaseCurrency,
+                    UnitOfMeasure = l.UnitOfMeasure,
                     EndDate = l.EndDate
                 })
                 .ToListAsync();
@@ -120,6 +121,7 @@ namespace Mazaad.Infrastructure.Services
                 TechnicalSpecs = listing.TechnicalSpecs,
                 MinOrderQuantity = listing.MinOrderQuantity,
                 AvailableQuantity = listing.AvailableQuantity,
+                UnitOfMeasure = listing.UnitOfMeasure,
                 PurityPercentage = listing.PurityPercentage,
                 BaseCurrency = listing.BaseCurrency,
                 CurrentHighestBid = listing.CurrentHighestBid,
@@ -151,6 +153,10 @@ namespace Mazaad.Infrastructure.Services
 
         public async Task<ListingResponseDto> CreateListingAsync(int companyId, CreateListingDto request)
         {
+            // Inherit UnitOfMeasure from the material category
+            var category = await _context.MaterialCategories.FindAsync(request.CategoryId);
+            var unitOfMeasure = category?.UnitOfMeasure ?? request.UnitOfMeasure ?? "kg";
+
             var listing = new Listings
             {
                 CompanyId = companyId,
@@ -159,6 +165,7 @@ namespace Mazaad.Infrastructure.Services
                 Description = request.Description,
                 MinOrderQuantity = request.MinOrderQuantity,
                 AvailableQuantity = request.AvailableQuantity,
+                UnitOfMeasure = unitOfMeasure,
                 PurityPercentage = request.PurityPercentage,
                 BaseCurrency = request.BaseCurrency,
                 StartDate = request.StartDate,
@@ -185,11 +192,16 @@ namespace Mazaad.Infrastructure.Services
             if (listing == null || listing.IsDeleted || listing.CompanyId != companyId)
                 return null;
 
+            // Inherit UnitOfMeasure from the category if the category changes
+            var category = await _context.MaterialCategories.FindAsync(request.CategoryId);
+            var unitOfMeasure = category?.UnitOfMeasure ?? listing.UnitOfMeasure;
+
             listing.CategoryId = request.CategoryId;
             listing.Title = request.Title;
             listing.Description = request.Description;
             listing.MinOrderQuantity = request.MinOrderQuantity;
             listing.AvailableQuantity = request.AvailableQuantity;
+            listing.UnitOfMeasure = unitOfMeasure;
             listing.PurityPercentage = request.PurityPercentage;
             listing.BaseCurrency = request.BaseCurrency;
             listing.StartDate = request.StartDate;
@@ -228,6 +240,7 @@ namespace Mazaad.Infrastructure.Services
             Description = listing.Description,
             MinOrderQuantity = listing.MinOrderQuantity,
             AvailableQuantity = listing.AvailableQuantity,
+            UnitOfMeasure = listing.UnitOfMeasure,
             PurityPercentage = listing.PurityPercentage,
             BaseCurrency = listing.BaseCurrency,
             StartDate = listing.StartDate,
