@@ -1,6 +1,7 @@
 // Mazaad.API/Program.cs
 
 using Mazaad.API.Hubs;
+using Mazaad.Infrastructure.Hubs;
 using Mazaad.Application.Interfaces;
 using Mazaad.Application.Interfaces.Repositories;
 using Mazaad.Application.Interfaces.Services;
