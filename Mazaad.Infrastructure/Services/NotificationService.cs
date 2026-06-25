@@ -5,7 +5,9 @@ using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Models;
+using Mazaad.Infrastructure.Hubs;
 using Mazaad.Infrastructure.Persistence;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mazaad.Infrastructure.Services
@@ -13,10 +15,12 @@ namespace Mazaad.Infrastructure.Services
     public class NotificationService : INotificationService
     {
         private readonly AppDbContext _context;
+        private readonly IHubContext<AuctionHub> _hubContext;
 
-        public NotificationService(AppDbContext context)
+        public NotificationService(AppDbContext context, IHubContext<AuctionHub> hubContext)
         {
             _context = context;
+            _hubContext = hubContext;
         }
 
         public async Task<IEnumerable<NotificationResponseDto>> GetUserNotificationsAsync(int userId)
@@ -77,6 +81,68 @@ namespace Mazaad.Infrastructure.Services
 
             _context.Notifications.Add(notification);
             await _context.SaveChangesAsync();
+        }
+
+        public async Task NotifySellerNewBidAsync(int sellerCompanyId, string listingTitle, string bidderName, decimal bidAmount)
+        {
+            var title = "New Bid Placed";
+            var message = $"A new bid of {bidAmount:C} has been placed on your listing '{listingTitle}' by {bidderName}.";
+
+            // Save to DB for all users belonging to the seller company
+            var userIds = await _context.Users
+                .Where(u => u.CompanyId == sellerCompanyId)
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            foreach (var userId in userIds)
+            {
+                var notification = new Notifications
+                {
+                    UserId = userId,
+                    Title = title,
+                    Message = message,
+                    IsRead = false,
+                    ReferenceType = "Listing",
+                    ReferenceId = 0,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Notifications.Add(notification);
+            }
+            await _context.SaveChangesAsync();
+
+            // Send via SignalR strictly to the specific company's group
+            await _hubContext.Clients.Group($"Company_{sellerCompanyId}").SendAsync("ReceiveNotification", message);
+        }
+
+        public async Task NotifyWinnerAsync(int winnerCompanyId, string listingTitle, decimal winningAmount)
+        {
+            var title = "Auction Won!";
+            var message = $"Congratulations! Your company won the auction for '{listingTitle}' with a winning bid of {winningAmount:C}.";
+
+            // Save to DB for all users belonging to the winner company
+            var userIds = await _context.Users
+                .Where(u => u.CompanyId == winnerCompanyId)
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            foreach (var userId in userIds)
+            {
+                var notification = new Notifications
+                {
+                    UserId = userId,
+                    Title = title,
+                    Message = message,
+                    IsRead = false,
+                    ReferenceType = "Listing",
+                    ReferenceId = 0,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Notifications.Add(notification);
+            }
+            await _context.SaveChangesAsync();
+
+            // Send via SignalR strictly to the specific company's group
+            await _hubContext.Clients.Group($"Company_{winnerCompanyId}").SendAsync("ReceiveNotification", message);
         }
 
         private static NotificationResponseDto MapToDto(Notifications n) => new NotificationResponseDto

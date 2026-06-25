@@ -13,5 +13,8 @@ namespace Mazaad.Application.Interfaces.Services
 
         /// <summary>Create and persist a notification (called internally by BiddingService, OrderService etc.)</summary>
         Task CreateNotificationAsync(int userId, string title, string message, string referenceType, int referenceId);
+
+        Task NotifySellerNewBidAsync(int sellerCompanyId, string listingTitle, string bidderName, decimal bidAmount);
+        Task NotifyWinnerAsync(int winnerCompanyId, string listingTitle, decimal winningAmount);
     }
 }

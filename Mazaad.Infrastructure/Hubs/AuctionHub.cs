@@ -3,8 +3,9 @@ using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 
-namespace Mazaad.API.Hubs
+namespace Mazaad.Infrastructure.Hubs
 {
     /// <summary>
     /// Enterprise-grade real-time auction hub

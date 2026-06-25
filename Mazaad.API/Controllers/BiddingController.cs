@@ -1,4 +1,4 @@
-using Mazaad.API.Hubs;
+using Mazaad.Infrastructure.Hubs;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
