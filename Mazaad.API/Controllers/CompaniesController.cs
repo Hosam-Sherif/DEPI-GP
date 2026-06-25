@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
-using Mazaad.Application.Interfaces;
+using Mazaad.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Mazaad.API.Controllers
@@ -34,15 +34,15 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>Register a new company.</summary>
-        [HttpPost]
-        public async Task<IActionResult> Create([FromBody] CreateCompanyDto request)
-        {
-            var created = await _companyService.CreateCompanyAsync(request);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
-        }
+        //[HttpPost]
+        //public async Task<IActionResult> Create([FromBody] CreateCompanyDto request)
+        //{
+        //    var created = await _companyService.CreateCompanyAsync(request);
+        //    return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        //}
 
         /// <summary>Verify / approve a company (admin action).</summary>
-        [HttpPatch("{id}/verify")]
+        [HttpPatch("{id}/verifyy")]
         public async Task<IActionResult> Verify(int id)
         {
             var success = await _companyService.VerifyCompanyAsync(id);

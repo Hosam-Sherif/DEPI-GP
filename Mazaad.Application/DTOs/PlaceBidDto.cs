@@ -1,4 +1,4 @@
-﻿namespace Mazaad.Application.DTOs
+namespace Mazaad.Application.DTOs
 {
     public class PlaceBidDto
     {

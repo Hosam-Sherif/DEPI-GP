@@ -1,4 +1,5 @@
-﻿using Mazaad.Infrastructure.Persistence;
+using Mazaad.Application.Interfaces.Repositories;
+using Mazaad.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
 
@@ -17,15 +18,17 @@ namespace Mazaad.Infrastructure.Persistence.Repositories
             GetTotalRevenueAsync(int companyId)
         {
             return await _context.Bids
-                .Where(x => x.Listing.company_id == companyId)
-                .SumAsync(x => x.total_bid_amount);
+                .Where(x => x.Listing.CompanyId == companyId)
+                .SumAsync(x => x.TotalBidAmount);
         }
 
         public async Task<int>
             GetOrdersCountAsync(int companyId)
         {
             return await _context.Orders
-                .CountAsync(x => x.company_id == companyId);
+                .CountAsync(x =>
+                    x.SellerCompanyId == companyId ||
+                    x.BuyerCompanyId == companyId);
         }
 
         public async Task<int>
@@ -33,15 +36,15 @@ namespace Mazaad.Infrastructure.Persistence.Repositories
         {
             return await _context.Listings
                 .CountAsync(x =>
-                    x.company_id == companyId &&
-                    x.end_date > DateTime.UtcNow);
+                    x.CompanyId == companyId &&
+                    x.EndDate > DateTime.UtcNow);
         }
 
         public async Task<int>
             GetInventoryCountAsync(int companyId)
         {
             return await _context.Listings
-                .CountAsync(x => x.company_id == companyId);
+                .CountAsync(x => x.CompanyId == companyId);
         }
     }
 }

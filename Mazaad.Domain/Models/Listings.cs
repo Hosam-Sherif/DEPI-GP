@@ -1,7 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Mazaad.Domain.Enums;
 
@@ -28,6 +27,10 @@ namespace Mazaad.Domain.Models
 
         public decimal MinOrderQuantity { get; set; }
         public decimal AvailableQuantity { get; set; }
+
+        /// <summary>Unit of measure for quantity fields (e.g. kg, gm, ton, MT, L, m3)</summary>
+        [MaxLength(20)]
+        public string UnitOfMeasure { get; set; } = "kg";
 
         /// <summary>Purity / grade percentage (e.g. 99.9)</summary>
         public decimal PurityPercentage { get; set; }
@@ -68,7 +71,7 @@ namespace Mazaad.Domain.Models
         public ICollection<Chat_Channels> Chat_Channels { get; set; } = new HashSet<Chat_Channels>();
 
         [Timestamp]
-        public byte[] RowVersion { get; set; }
+        public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
         public string? image_url { get; set; }
     }

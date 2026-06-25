@@ -17,6 +17,7 @@ namespace Mazaad.Application.DTOs
         public string TechnicalSpecs { get; set; } = string.Empty;
         public decimal MinOrderQuantity { get; set; }
         public decimal AvailableQuantity { get; set; }
+        public string UnitOfMeasure { get; set; } = "kg";
         public decimal PurityPercentage { get; set; }
         public string BaseCurrency { get; set; } = "USD";
         public decimal CurrentHighestBid { get; set; }

@@ -6,21 +6,24 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <!-- Infrastructure only depends on Domain — no circular reference -->
+  <!-- Infrastructure depends on Application and Domain -->
   <ItemGroup>
     <ProjectReference Include="..\Mazaad.Domain\Mazaad.Domain.csproj" />
+    <ProjectReference Include="..\Mazaad.Application\Mazaad.Application.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.25" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.25">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="QRCoder" Version="1.4.3" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Migrations\" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
 </Project>

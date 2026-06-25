@@ -16,10 +16,10 @@ namespace Mazaad.Domain.Models
         [ForeignKey("SenderUser")]
         public int SenderUserId { get; set; }
 
-        public string MessageText { get; set; }
+        public string MessageText { get; set; } = string.Empty;
         public DateTime SentAt { get; set; }
 
-        public Chat_Channels Channel { get; set; }
-        public App_Users SenderUser { get; set; }
+        public Chat_Channels Channel { get; set; } = null!;
+        public ApplicationUser SenderUser { get; set; } = null!;
     }
 }

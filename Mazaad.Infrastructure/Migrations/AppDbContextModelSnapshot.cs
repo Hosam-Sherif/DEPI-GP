@@ -22,7 +22,7 @@ namespace Mazaad.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("Mazaad.Domain.Models.App_Users", b =>
+            modelBuilder.Entity("Mazaad.Domain.Models.ApplicationRole", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -30,15 +30,87 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("CompanyId")
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("NormalizedName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("RoleNameIndex")
+                        .HasFilter("[NormalizedName] IS NOT NULL");
+
+                    b.ToTable("AspNetRoles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Platform-level administrator",
+                            Name = "SuperAdmin",
+                            NormalizedName = "SUPERADMIN"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Manages users within their own company",
+                            Name = "CompanyAdmin",
+                            NormalizedName = "COMPANYADMIN"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Standard bidder / operator",
+                            Name = "CompanyUser",
+                            NormalizedName = "COMPANYUSER"
+                        });
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ApplicationUser", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccessFailedCount")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("bit");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -51,44 +123,58 @@ namespace Mazaad.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("LastLoginDate")
+                    b.Property<DateTime?>("LastLoginDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("LockoutEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("LockoutEnd")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NormalizedEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("NormalizedUserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<string>("PasswordHash")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("PhoneNumberConfirmed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SecurityStamp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("TwoFactorEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
 
-                    b.ToTable("AppUsers");
+                    b.HasIndex("NormalizedEmail")
+                        .HasDatabaseName("EmailIndex");
 
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CompanyId = 1,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "ahmed@siemens-mena.com",
-                            FullName = "Ahmed Al-Rashid",
-                            IsActive = true,
-                            JobTitle = "Asset Manager",
-                            LastLoginDate = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PasswordHash = "hashed_password_placeholder"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CompanyId = 2,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Email = "sara@gulhheavy.com",
-                            FullName = "Sara Johnson",
-                            IsActive = true,
-                            JobTitle = "Procurement Officer",
-                            LastLoginDate = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PasswordHash = "hashed_password_placeholder"
-                        });
+                    b.HasIndex("NormalizedUserName")
+                        .IsUnique()
+                        .HasDatabaseName("UserNameIndex")
+                        .HasFilter("[NormalizedUserName] IS NOT NULL");
+
+                    b.ToTable("AspNetUsers", (string)null);
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Bids", b =>
@@ -207,19 +293,6 @@ namespace Mazaad.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("CommissionPolicies");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Active = true,
-                            CommissionRate = 2.5m,
-                            EffectiveFrom = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            EffectiveTo = new DateTime(2027, 12, 31, 0, 0, 0, 0, DateTimeKind.Utc),
-                            MaxAmount = 10000000m,
-                            MinAmount = 10000m,
-                            PolicyName = "Standard Platform Fee"
-                        });
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Companies", b =>
@@ -252,8 +325,8 @@ namespace Mazaad.Infrastructure.Migrations
                     b.Property<int>("IndustryId")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsVerified")
-                        .HasColumnType("bit");
+                    b.Property<string>("RejectionReason")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TaxRegistrationNum")
                         .IsRequired()
@@ -262,52 +335,68 @@ namespace Mazaad.Infrastructure.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int>("VerificationStatus")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("VerifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("VerifiedByUserId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("IndustryId");
 
                     b.ToTable("Companies");
+                });
 
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            AddressDetails = "Industrial Park West, Gate 12, Munich 80331, DE",
-                            City = "Munich",
-                            CommercialRegNum = "CR-001-2025",
-                            CompanyName = "Siemens Healthineers MENA",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IndustryId = 1,
-                            IsVerified = true,
-                            TaxRegistrationNum = "TRN-001-2025",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 2,
-                            AddressDetails = "Al Quoz Industrial Area 3, Dubai, UAE",
-                            City = "Dubai",
-                            CommercialRegNum = "CR-002-2025",
-                            CompanyName = "Gulf Heavy Equipment LLC",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IndustryId = 2,
-                            IsVerified = true,
-                            TaxRegistrationNum = "TRN-002-2025",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 3,
-                            AddressDetails = "2400 Technology Drive, Austin TX 78745, US",
-                            City = "Austin",
-                            CommercialRegNum = "CR-003-2025",
-                            CompanyName = "Hydro Cooling Solutions",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IndustryId = 3,
-                            IsVerified = true,
-                            TaxRegistrationNum = "TRN-003-2025",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
+            modelBuilder.Entity("Mazaad.Domain.Models.CompanyDocument", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FilePath")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UploadedByUserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("UploadedByUserId");
+
+                    b.ToTable("CompanyDocuments");
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.IndustryType", b =>
@@ -334,48 +423,65 @@ namespace Mazaad.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("IndustryTypes");
+                });
 
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IndustryName = "Medical Devices",
-                            IsDeleted = false,
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IndustryName = "Heavy Machinery",
-                            IsDeleted = false,
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 3,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IndustryName = "Data Centers",
-                            IsDeleted = false,
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 4,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IndustryName = "Real Estate",
-                            IsDeleted = false,
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 5,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IndustryName = "Robotics",
-                            IsDeleted = false,
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
+            modelBuilder.Entity("Mazaad.Domain.Models.InventoryItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("category_id")
+                        .HasColumnType("int");
+
+                    b.Property<int>("company_id")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("created_at")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal?>("current_market_price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("image_name")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("image_path")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("minimum_auction_price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("quantity")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<int>("status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("unit_of_measure")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("updated_at")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("category_id");
+
+                    b.HasIndex("company_id");
+
+                    b.ToTable("InventoryItems");
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Listings", b =>
@@ -442,6 +548,12 @@ namespace Mazaad.Infrastructure.Migrations
                     b.Property<decimal>("PurityPercentage")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
 
@@ -457,8 +569,16 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<string>("UnitOfMeasure")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("image_url")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -467,158 +587,6 @@ namespace Mazaad.Infrastructure.Migrations
                     b.HasIndex("CompanyId");
 
                     b.ToTable("Listings");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            AvailableQuantity = 1m,
-                            BaseCurrency = "USD",
-                            BidCount = 12,
-                            CategoryId = 1,
-                            CompanyId = 1,
-                            Condition = 1,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentHighestBid = 3420000m,
-                            Description = "Deutsche Klinik Regional Distribution Center · Condition: Certified/Refurbished. Full-body 3 Tesla MRI system with 70cm bore.",
-                            DueDiligenceUrls = "inspection_report.pdf,maintenance_log.pdf,terms_of_sale.pdf",
-                            EndDate = new DateTime(2026, 12, 31, 23, 59, 59, 0, DateTimeKind.Utc),
-                            ImageUrl = "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800",
-                            IsDeleted = false,
-                            Location = "Industrial Park West, Gate 12, Munich 80331, DE",
-                            MinOrderQuantity = 1m,
-                            PurityPercentage = 100m,
-                            StartDate = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Status = 1,
-                            TechnicalSpecs = "{\"FieldStrength\":\"3 Tesla\",\"BoreSize\":\"70 cm\",\"ManufactureDate\":\"October 2021\",\"ImportStatus\":\"Documentation/Cited\",\"SoftwareVersion\":\"Syngo MR E11\"}",
-                            Title = "Siemens Healthineers Lumina 3T MRI Suite",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 2,
-                            AvailableQuantity = 3m,
-                            BaseCurrency = "USD",
-                            BidCount = 8,
-                            CategoryId = 2,
-                            CompanyId = 2,
-                            Condition = 0,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentHighestBid = 285000m,
-                            Description = "Late 2024 model, 49-tonne hydraulic excavator with advanced automation package.",
-                            DueDiligenceUrls = "excavator_inspection.pdf",
-                            EndDate = new DateTime(2026, 12, 31, 23, 59, 59, 0, DateTimeKind.Utc),
-                            ImageUrl = "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=800",
-                            IsDeleted = false,
-                            Location = "Al Quoz Industrial Area 3, Dubai, UAE",
-                            MinOrderQuantity = 1m,
-                            PurityPercentage = 100m,
-                            StartDate = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Status = 1,
-                            TechnicalSpecs = "{\"OperatingWeight\":\"49 tonnes\",\"NetPower\":\"396 HP\",\"MaxDigDepth\":\"7.42m\",\"Condition\":\"New\"}",
-                            Title = "Caterpillar 349 Next Gen Hydraulic Excavator",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 3,
-                            AvailableQuantity = 2m,
-                            BaseCurrency = "USD",
-                            BidCount = 5,
-                            CategoryId = 3,
-                            CompanyId = 3,
-                            Condition = 0,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentHighestBid = 1240000m,
-                            Description = "128x NVIDIA H100 80GB SXM5 GPUs in liquid-cooled rack cluster configuration.",
-                            DueDiligenceUrls = "cluster_specs.pdf,warranty.pdf",
-                            EndDate = new DateTime(2026, 12, 31, 23, 59, 59, 0, DateTimeKind.Utc),
-                            ImageUrl = "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800",
-                            IsDeleted = false,
-                            Location = "2400 Technology Drive, Austin TX 78745, US",
-                            MinOrderQuantity = 1m,
-                            PurityPercentage = 100m,
-                            StartDate = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Status = 1,
-                            TechnicalSpecs = "{\"GPUs\":\"128x NVIDIA H100 80GB\",\"CoolingType\":\"Liquid\",\"TDP\":\"700W per GPU\",\"Interconnect\":\"NVLink 4.0\"}",
-                            Title = "Bulk Liquid-Cooled GPU Cluster (128x H100)",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 4,
-                            AvailableQuantity = 10m,
-                            BaseCurrency = "USD",
-                            BidCount = 3,
-                            CategoryId = 4,
-                            CompanyId = 2,
-                            Condition = 0,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentHighestBid = 640000m,
-                            Description = "10x 2026 electric delivery vans, 400km range, pre-configured with fleet management software.",
-                            DueDiligenceUrls = "fleet_inspection.pdf",
-                            EndDate = new DateTime(2026, 12, 31, 23, 59, 59, 0, DateTimeKind.Utc),
-                            ImageUrl = "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800",
-                            IsDeleted = false,
-                            Location = "Dubai Fleet Depot, Al Quoz, UAE",
-                            MinOrderQuantity = 10m,
-                            PurityPercentage = 100m,
-                            StartDate = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Status = 1,
-                            TechnicalSpecs = "{\"Units\":10,\"Range\":\"400 km\",\"Payload\":\"900 kg\",\"Charging\":\"DC Fast 150kW\"}",
-                            Title = "2026 EV Delivery Fleet Bundle (10 Units)",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 5,
-                            AvailableQuantity = 1m,
-                            BaseCurrency = "USD",
-                            BidCount = 2,
-                            CategoryId = 5,
-                            CompanyId = 1,
-                            Condition = 1,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentHighestBid = 18500000m,
-                            Description = "Grade-A commercial office building, 12 floors, 15,000 sqm GLA, fully tenanted.",
-                            DueDiligenceUrls = "property_report.pdf,tenancy_schedule.pdf",
-                            EndDate = new DateTime(2026, 12, 31, 23, 59, 59, 0, DateTimeKind.Utc),
-                            ImageUrl = "https://images.unsplash.com/photo-1486325212027-8081e485255e?w=800",
-                            IsDeleted = false,
-                            Location = "Downtown Business District, Munich, DE",
-                            MinOrderQuantity = 1m,
-                            PurityPercentage = 100m,
-                            StartDate = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Status = 1,
-                            TechnicalSpecs = "{\"GLA\":\"15000 sqm\",\"Floors\":12,\"Occupancy\":\"97%\",\"Certification\":\"LEED Gold\"}",
-                            Title = "Downtown Financial District Office Complex",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        },
-                        new
-                        {
-                            Id = 6,
-                            AvailableQuantity = 5m,
-                            BaseCurrency = "USD",
-                            BidCount = 7,
-                            CategoryId = 6,
-                            CompanyId = 3,
-                            Condition = 1,
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            CurrentHighestBid = 192500m,
-                            Description = "5x FANUC R-2000iC/165F robotic arms, fully integrated production line, 2023 vintage.",
-                            DueDiligenceUrls = "robot_certifications.pdf,maintenance_history.pdf",
-                            EndDate = new DateTime(2026, 12, 31, 23, 59, 59, 0, DateTimeKind.Utc),
-                            ImageUrl = "https://images.unsplash.com/photo-1535378917042-10a22c95931a?w=800",
-                            IsDeleted = false,
-                            Location = "2400 Technology Drive, Austin TX 78745, US",
-                            MinOrderQuantity = 5m,
-                            PurityPercentage = 100m,
-                            StartDate = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Status = 1,
-                            TechnicalSpecs = "{\"Units\":5,\"Payload\":\"165 kg\",\"Reach\":\"2655 mm\",\"Repeatability\":\"±0.05 mm\",\"Year\":2023}",
-                            Title = "FANUC R-2000iC Production Line (5 Units)",
-                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
-                        });
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Material_Categories", b =>
@@ -647,56 +615,6 @@ namespace Mazaad.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("MaterialCategories");
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            CategoryName = "Medical Equipment",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Diagnostic and therapeutic medical devices",
-                            UnitOfMeasure = "Unit"
-                        },
-                        new
-                        {
-                            Id = 2,
-                            CategoryName = "Construction Machinery",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Heavy construction and earthmoving equipment",
-                            UnitOfMeasure = "Unit"
-                        },
-                        new
-                        {
-                            Id = 3,
-                            CategoryName = "IT Infrastructure",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Servers, networking equipment and cooling systems",
-                            UnitOfMeasure = "Unit"
-                        },
-                        new
-                        {
-                            Id = 4,
-                            CategoryName = "Fleet Vehicles",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Commercial and fleet vehicle bundles",
-                            UnitOfMeasure = "Fleet"
-                        },
-                        new
-                        {
-                            Id = 5,
-                            CategoryName = "Real Estate",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Commercial and industrial real estate",
-                            UnitOfMeasure = "sqm"
-                        },
-                        new
-                        {
-                            Id = 6,
-                            CategoryName = "Industrial Robots",
-                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Robotic arms and automated production lines",
-                            UnitOfMeasure = "Unit"
-                        });
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Messages", b =>
@@ -866,13 +784,204 @@ namespace Mazaad.Infrastructure.Migrations
                     b.ToTable("Payments");
                 });
 
-            modelBuilder.Entity("Mazaad.Domain.Models.App_Users", b =>
+            modelBuilder.Entity("Mazaad.Domain.Models.RefreshToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedByIp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ReplacedByToken")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RevokedByIp")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("RevokedReason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.SecurityLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Details")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EventType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("IpAddress")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("Success")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("UserAgent")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("EventType");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("SecurityLogs");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClaimValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("AspNetRoleClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClaimValue")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AspNetUserClaims", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
+                {
+                    b.Property<string>("LoginProvider")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ProviderKey")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ProviderDisplayName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("LoginProvider", "ProviderKey");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AspNetUserLogins", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<int>", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("AspNetUserRoles", (string)null);
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LoginProvider")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Value")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("UserId", "LoginProvider", "Name");
+
+                    b.ToTable("AspNetUserTokens", (string)null);
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ApplicationUser", b =>
                 {
                     b.HasOne("Mazaad.Domain.Models.Companies", "Company")
                         .WithMany("Users")
                         .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Company");
                 });
@@ -891,7 +1000,7 @@ namespace Mazaad.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("Mazaad.Domain.Models.App_Users", "User")
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", "User")
                         .WithMany("Bids")
                         .HasForeignKey("PlacedByUserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -942,6 +1051,44 @@ namespace Mazaad.Infrastructure.Migrations
                     b.Navigation("Industry");
                 });
 
+            modelBuilder.Entity("Mazaad.Domain.Models.CompanyDocument", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.Companies", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", "UploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("UploadedByUserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Company");
+
+                    b.Navigation("UploadedByUser");
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.InventoryItem", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.Material_Categories", "Category")
+                        .WithMany()
+                        .HasForeignKey("category_id")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Mazaad.Domain.Models.Companies", "Company")
+                        .WithMany()
+                        .HasForeignKey("company_id")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Company");
+                });
+
             modelBuilder.Entity("Mazaad.Domain.Models.Listings", b =>
                 {
                     b.HasOne("Mazaad.Domain.Models.Material_Categories", "Category")
@@ -969,7 +1116,7 @@ namespace Mazaad.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("Mazaad.Domain.Models.App_Users", "SenderUser")
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", "SenderUser")
                         .WithMany("Messages")
                         .HasForeignKey("SenderUserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -982,7 +1129,7 @@ namespace Mazaad.Infrastructure.Migrations
 
             modelBuilder.Entity("Mazaad.Domain.Models.Notifications", b =>
                 {
-                    b.HasOne("Mazaad.Domain.Models.App_Users", "User")
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", "User")
                         .WithMany("Notifications")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.NoAction)
@@ -1037,13 +1184,89 @@ namespace Mazaad.Infrastructure.Migrations
                     b.Navigation("Order");
                 });
 
-            modelBuilder.Entity("Mazaad.Domain.Models.App_Users", b =>
+            modelBuilder.Entity("Mazaad.Domain.Models.RefreshToken", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", "User")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.SecurityLog", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", "User")
+                        .WithMany("SecurityLogs")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.ApplicationRole", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<int>", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<int>", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<int>", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.ApplicationRole", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<int>", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ApplicationUser", b =>
                 {
                     b.Navigation("Bids");
 
                     b.Navigation("Messages");
 
                     b.Navigation("Notifications");
+
+                    b.Navigation("RefreshTokens");
+
+                    b.Navigation("SecurityLogs");
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Bids", b =>
