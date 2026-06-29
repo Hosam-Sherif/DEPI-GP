@@ -27,6 +27,21 @@ namespace Mazaad.API.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Dashboard "My Listings": paginated listings owned by the authenticated company.
+        /// </summary>
+        [HttpGet("mine")]
+        [Authorize]
+        public async Task<IActionResult> GetMine([FromQuery] ListingFilterDto filter)
+        {
+            var companyId = GetCurrentCompanyId();
+            if (companyId == null)
+                return Unauthorized(new { error = "A valid company account is required." });
+
+            var result = await _listingService.GetMyListingsAsync(companyId.Value, filter);
+            return Ok(result);
+        }
+
         /// <summary>Summary of a single listing.</summary>
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
@@ -75,6 +90,23 @@ namespace Mazaad.API.Controllers
             return Ok(updated);
         }
 
+        /// <summary>
+        /// Cancel a listing — sets status to Cancelled without deleting data.
+        /// Only members of the owning company can cancel.
+        /// </summary>
+        [HttpPatch("{id}/cancel")]
+        [Authorize]
+        public async Task<IActionResult> Cancel(int id)
+        {
+            var companyId = GetCurrentCompanyId();
+            if (companyId == null)
+                return Unauthorized(new { error = "A valid company account is required to cancel listings." });
+
+            var success = await _listingService.CancelListingAsync(id, companyId.Value);
+            if (!success) return BadRequest(new { error = "Could not cancel listing. It may not exist, already be cancelled, or you don't own it." });
+            return NoContent();
+        }
+
         /// <summary>Soft-delete a listing. Only members of the owning company can delete.</summary>
         [HttpDelete("{id}")]
         [Authorize]
@@ -89,9 +121,34 @@ namespace Mazaad.API.Controllers
             return NoContent();
         }
 
+        /// <summary>Upload or replace the primary image for a listing.</summary>
+        [HttpPost("{id}/image")]
+        [Authorize]
+        public async Task<IActionResult> UploadImage(int id, IFormFile image)
+        {
+            if (image == null || image.Length == 0)
+                return BadRequest(new { error = "No image file provided." });
+
+            var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
+            if (!allowedTypes.Contains(image.ContentType.ToLower()))
+                return BadRequest(new { error = "Only JPEG, PNG, and WebP images are allowed." });
+
+            if (image.Length > 5 * 1024 * 1024)
+                return BadRequest(new { error = "Image size must not exceed 5MB." });
+
+            var companyId = GetCurrentCompanyId();
+            if (companyId == null)
+                return Unauthorized(new { error = "A valid company account is required." });
+
+            var updatedListing = await _listingService.UploadListingImageAsync(id, companyId.Value, image);
+            if (updatedListing == null)
+                return NotFound(new { error = "Listing not found or you do not own it." });
+
+            return Ok(new { imageUrl = updatedListing.ImageUrl });
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────────
 
-        /// <summary>Extract companyId from JWT claims. Returns null if not present or not a valid company user.</summary>
         private int? GetCurrentCompanyId()
         {
             var claim = User.FindFirst("companyId")?.Value;

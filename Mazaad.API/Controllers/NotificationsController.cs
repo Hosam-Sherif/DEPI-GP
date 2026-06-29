@@ -1,11 +1,13 @@
 using System.Threading.Tasks;
 using Mazaad.Application.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Mazaad.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class NotificationsController : ControllerBase
     {
         private readonly INotificationService _notificationService;
@@ -15,13 +17,20 @@ namespace Mazaad.API.Controllers
             _notificationService = notificationService;
         }
 
+        private int? GetCurrentUserId()
+        {
+            var claim = User.FindFirst("uid")?.Value;
+            return int.TryParse(claim, out var id) && id > 0 ? id : null;
+        }
+
         /// <summary>Get all notifications for the current user.</summary>
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-            // TODO: extract from JWT
-            int currentUserId = 1;
-            var notifications = await _notificationService.GetUserNotificationsAsync(currentUserId);
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var notifications = await _notificationService.GetUserNotificationsAsync(userId.Value);
             return Ok(notifications);
         }
 
@@ -29,8 +38,10 @@ namespace Mazaad.API.Controllers
         [HttpGet("unread-count")]
         public async Task<IActionResult> GetUnreadCount()
         {
-            int currentUserId = 1;
-            var count = await _notificationService.GetUnreadCountAsync(currentUserId);
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var count = await _notificationService.GetUnreadCountAsync(userId.Value);
             return Ok(new { UnreadCount = count });
         }
 
@@ -38,8 +49,10 @@ namespace Mazaad.API.Controllers
         [HttpPut("{id}/read")]
         public async Task<IActionResult> MarkAsRead(int id)
         {
-            int currentUserId = 1;
-            var success = await _notificationService.MarkAsReadAsync(id, currentUserId);
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var success = await _notificationService.MarkAsReadAsync(id, userId.Value);
             if (!success) return NotFound();
             return NoContent();
         }
@@ -48,8 +61,10 @@ namespace Mazaad.API.Controllers
         [HttpPut("read-all")]
         public async Task<IActionResult> MarkAllAsRead()
         {
-            int currentUserId = 1;
-            await _notificationService.MarkAllAsReadAsync(currentUserId);
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            await _notificationService.MarkAllAsReadAsync(userId.Value);
             return NoContent();
         }
     }

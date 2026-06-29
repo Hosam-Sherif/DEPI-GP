@@ -8,12 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mazaad.Infrastructure.Persistence
 {
-    /// <summary>
-    /// بدلنا DbContext بـ IdentityDbContext عشان Identity
-    /// تعمل الـ tables بتاعتها أوتوماتيك:
-    /// AspNetUsers, AspNetRoles, AspNetUserRoles, إلخ
-    /// كلهم بـ int PK عشان يتوافق مع الـ schema الموجود.
-    /// </summary>
     public class AppDbContext : IdentityDbContext<
         ApplicationUser,
         ApplicationRole,
@@ -55,6 +49,22 @@ namespace Mazaad.Infrastructure.Persistence
                 b.HasOne(u => u.Company)
                  .WithMany(c => c.Users)
                  .HasForeignKey(u => u.CompanyId)
+                 .OnDelete(DeleteBehavior.NoAction)
+                 .IsRequired(false);
+
+                b.HasMany(u => u.Messages)
+                 .WithOne(m => m.SenderUser)
+                 .HasForeignKey(m => m.SenderUserId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasMany(u => u.Bids)
+                 .WithOne(bid => bid.User)
+                 .HasForeignKey(bid => bid.PlacedByUserId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasMany(u => u.Notifications)
+                 .WithOne(n => n.User)
+                 .HasForeignKey(n => n.UserId)
                  .OnDelete(DeleteBehavior.NoAction);
             });
 
@@ -68,7 +78,6 @@ namespace Mazaad.Infrastructure.Persistence
                  .HasForeignKey(r => r.UserId)
                  .OnDelete(DeleteBehavior.Cascade);
 
-                // index للبحث السريع بالـ token string
                 b.HasIndex(r => r.Token).IsUnique();
             });
 
@@ -82,7 +91,6 @@ namespace Mazaad.Infrastructure.Persistence
                  .HasForeignKey(s => s.UserId)
                  .OnDelete(DeleteBehavior.NoAction);
 
-                // index للفلترة بالتاريخ والـ event type
                 b.HasIndex(s => s.CreatedAt);
                 b.HasIndex(s => s.EventType);
                 b.HasIndex(s => s.UserId);
@@ -111,6 +119,12 @@ namespace Mazaad.Infrastructure.Persistence
                  .WithMany(i => i.Companies)
                  .HasForeignKey(c => c.IndustryId)
                  .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasOne<ApplicationUser>()
+                 .WithMany()
+                 .HasForeignKey(c => c.VerifiedByUserId)
+                 .OnDelete(DeleteBehavior.NoAction)
+                 .IsRequired(false);
             });
 
             // ── Chat_Channels ─────────────────────────────────────────────────

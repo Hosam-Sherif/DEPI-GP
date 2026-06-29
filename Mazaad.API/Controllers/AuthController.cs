@@ -51,7 +51,6 @@ namespace Mazaad.API.Controllers
 
             if (!result.Succeeded)
             {
-                // الـ client يوجه لصفحة الـ 2FA
                 if (result.Error == "2FA_REQUIRED")
                     return Ok(new { requiresTwoFactor = true, email = dto.Email });
 
@@ -103,7 +102,6 @@ namespace Mazaad.API.Controllers
             if (!string.IsNullOrEmpty(refreshToken))
                 await _authService.LogoutAsync(refreshToken, GetIpAddress());
 
-            // نمسح الـ cookie بغض النظر
             Response.Cookies.Delete("refreshToken");
 
             return NoContent();
@@ -126,10 +124,40 @@ namespace Mazaad.API.Controllers
             if (!result.Succeeded)
                 return BadRequest(new { errors = result.Errors });
 
-            // نمسح الـ cookie بعد تغيير الباسورد — لازم يعمل login تاني
             Response.Cookies.Delete("refreshToken");
 
             return NoContent();
+        }
+
+        /// <summary>
+        /// طلب رابط استعادة كلمة المرور — بيتبعت دايمًا 200 OK
+        /// (حتى لو الإيميل غير مسجل) عشان منكشفش وجود الإيميل من عدمه.
+        /// </summary>
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+        {
+            await _authService.ForgotPasswordAsync(dto, GetIpAddress());
+
+            return Ok(new
+            {
+                message = "لو الإيميل ده مسجل عندنا، تم إرسال رابط استعادة كلمة المرور إليه."
+            });
+        }
+
+        /// <summary>
+        /// تعيين كلمة مرور جديدة باستخدام الـ Token اللي جه في رابط الإيميل.
+        /// </summary>
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+        {
+            var result = await _authService.ResetPasswordAsync(dto, GetIpAddress());
+
+            if (!result.Succeeded)
+                return BadRequest(new { errors = result.Errors });
+
+            return Ok(new { message = "تم تعيين كلمة المرور الجديدة بنجاح." });
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
@@ -138,8 +166,8 @@ namespace Mazaad.API.Controllers
         {
             Response.Cookies.Append("refreshToken", token, new CookieOptions
             {
-                HttpOnly = true,   // مش accessible من JavaScript
-                Secure = true,   // HTTPS فقط
+                HttpOnly = true,
+                Secure = true,
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTime.UtcNow.AddDays(30)
             });

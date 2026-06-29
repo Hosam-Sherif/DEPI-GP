@@ -21,6 +21,10 @@ namespace Mazaad.Application.Interfaces.Services
         /// <summary>Single bid with full detail</summary>
         Task<BidDetailDto?> GetBidDetailAsync(int bidId);
 
+        /// <summary>All bids placed by a specific company (for My Bids page)</summary>
+        Task<IEnumerable<BidDetailDto>> GetBidsByCompanyAsync(int companyId);
+
+        /// <summary>Cancel a bid</summary>
         Task<bool> DeleteBidAsync(int bidId, int companyId);
     }
 }

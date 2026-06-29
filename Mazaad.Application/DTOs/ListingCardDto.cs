@@ -19,6 +19,8 @@ namespace Mazaad.Application.DTOs
         public string BaseCurrency { get; set; } = "USD";
         public string UnitOfMeasure { get; set; } = "kg";
         public DateTime EndDate { get; set; }
+        /// <summary>Id of the winning (highest) bid. Null if no bids placed.</summary>
+        public int? WinningBidId { get; set; }
 
         /// <summary>Seconds remaining until auction ends (negative if ended)</summary>
         public double SecondsRemaining => (EndDate - DateTime.UtcNow).TotalSeconds;

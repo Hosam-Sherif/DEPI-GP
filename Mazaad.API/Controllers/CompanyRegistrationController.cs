@@ -1,6 +1,4 @@
-﻿// Mazaad.API/Controllers/CompanyRegistrationController.cs
-
-using Mazaad.Application.DTOs.Company;
+﻿using Mazaad.Application.DTOs.Company;
 using Mazaad.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +7,7 @@ namespace Mazaad.API.Controllers
 {
     [ApiController]
     [Route("api/companies")]
+    [Authorize(Roles = "SuperAdmin")]
     public class CompanyRegistrationController : ControllerBase
     {
         private readonly ICompanyRegistrationService _registrationService;
@@ -46,40 +45,9 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>
-        /// يجيب الشركات المنتظرة — SuperAdmin فقط.
-        /// </summary>
-        [HttpGet("pending")]
-        //[Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> GetPending()
-        {
-            var companies = await _registrationService.GetPendingCompaniesAsync();
-            return Ok(companies);
-        }
-
-        /// <summary>
-        /// الموافقة أو الرفض — SuperAdmin فقط.
-        /// </summary>
-        [HttpPatch("{id}/verify")]
-        //[Authorize(Roles = "SuperAdmin")]
-        public async Task<IActionResult> Verify(int id, [FromBody] VerifyCompanyDto dto)
-        {
-            var adminUserId = GetCurrentUserId();
-            if (adminUserId == null) return Unauthorized();
-
-            var result = await _registrationService.VerifyCompanyAsync(
-                id, adminUserId.Value, dto, GetIpAddress());
-
-            if (!result.Succeeded)
-                return BadRequest(new { errors = result.Errors });
-
-            return NoContent();
-        }
-
-        /// <summary>
         /// يجيب مستندات شركة — SuperAdmin فقط.
         /// </summary>
         [HttpGet("{id}/documents")]
-        //[Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> GetDocuments(int id)
         {
             var documents = await _documentService.GetCompanyDocumentsAsync(id);
@@ -90,7 +58,6 @@ namespace Mazaad.API.Controllers
         /// تحميل مستند — SuperAdmin فقط.
         /// </summary>
         [HttpGet("documents/{documentId}/download")]
-        [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> DownloadDocument(int documentId)
         {
             var userId = GetCurrentUserId();

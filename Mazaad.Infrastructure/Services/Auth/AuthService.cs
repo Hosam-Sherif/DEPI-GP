@@ -6,8 +6,10 @@ using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Enums;
 using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Mazaad.Infrastructure.Services.Auth
 {
@@ -18,27 +20,32 @@ namespace Mazaad.Infrastructure.Services.Auth
         private readonly IJwtService _jwtService;
         private readonly ISecurityLogService _securityLog;
         private readonly AppDbContext _context;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _config;
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IJwtService jwtService,
             ISecurityLogService securityLog,
-            AppDbContext context)
+            AppDbContext context,
+            IEmailService emailService,
+            IConfiguration config)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _jwtService = jwtService;
             _securityLog = securityLog;
             _context = context;
+            _emailService = emailService;
+            _config = config;
         }
 
-        // ── Register ──────────────────────────────────────────────────────────
+        // ── Register (مزايد عادي / Bidder) ──────────────────────────────────
         public async Task<Result<AuthResponseDto>> RegisterAsync(
             RegisterDto dto,
             string ipAddress)
         {
-            // تأكد إن الـ email مش موجود
             var existing = await _userManager.FindByEmailAsync(dto.Email);
             if (existing != null)
                 return Result<AuthResponseDto>.Failure("Email already registered.");
@@ -47,9 +54,8 @@ namespace Mazaad.Infrastructure.Services.Auth
             {
                 FullName = dto.FullName,
                 Email = dto.Email,
-                UserName = dto.Email, // Identity بتستخدم UserName للـ login
+                UserName = dto.Email,
                 JobTitle = dto.JobTitle,
-                CompanyId = dto.CompanyId,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -60,8 +66,7 @@ namespace Mazaad.Infrastructure.Services.Auth
                 return Result<AuthResponseDto>.Failure(
                     result.Errors.Select(e => e.Description));
 
-            // الـ default role للـ user العادي
-            await _userManager.AddToRoleAsync(user, "CompanyUser");
+            await _userManager.AddToRoleAsync(user, "Bidder");
 
             await _securityLog.LogAsync(
                 SecurityEventType.AccountRegistered,
@@ -80,7 +85,6 @@ namespace Mazaad.Infrastructure.Services.Auth
         {
             var user = await _userManager.FindByEmailAsync(dto.Email);
 
-            // نرجع نفس الـ message عشان ما نكشفش إن الـ email موجود أو لأ
             if (user == null || !user.IsActive)
             {
                 await _securityLog.LogAsync(
@@ -93,7 +97,6 @@ namespace Mazaad.Infrastructure.Services.Auth
                 return Result<AuthResponseDto>.Failure("Invalid email or password.");
             }
 
-            // CheckPasswordSignInAsync بتتحكم في الـ lockout أوتوماتيك
             var signInResult = await _signInManager.CheckPasswordSignInAsync(
                 user, dto.Password, lockoutOnFailure: true);
 
@@ -112,10 +115,7 @@ namespace Mazaad.Infrastructure.Services.Auth
             }
 
             if (signInResult.RequiresTwoFactor)
-            {
-                // بنرجع رسالة خاصة — الـ client يوجه لصفحة الـ 2FA
                 return Result<AuthResponseDto>.Failure("2FA_REQUIRED");
-            }
 
             if (!signInResult.Succeeded)
             {
@@ -130,7 +130,6 @@ namespace Mazaad.Infrastructure.Services.Auth
                 return Result<AuthResponseDto>.Failure("Invalid email or password.");
             }
 
-            // تحديث آخر تسجيل دخول
             user.LastLoginDate = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
 
@@ -156,8 +155,6 @@ namespace Mazaad.Infrastructure.Services.Auth
             if (storedToken == null)
                 return Result<AuthResponseDto>.Failure("Invalid token.");
 
-            // Reuse detection — لو token اتستخدم قبل كده
-            // معناه في حد سرق الـ token فبنلغي كل tokens الـ user
             if (storedToken.IsRevoked)
             {
                 await RevokeAllUserTokensAsync(
@@ -180,7 +177,6 @@ namespace Mazaad.Infrastructure.Services.Auth
 
             var user = storedToken.User;
 
-            // Rotate: نلغي القديم ونعمل جديد
             storedToken.IsRevoked = true;
             storedToken.RevokedByIp = ipAddress;
             storedToken.RevokedReason = "Rotated";
@@ -203,7 +199,7 @@ namespace Mazaad.Infrastructure.Services.Auth
                 .FirstOrDefaultAsync(r => r.Token == refreshToken);
 
             if (storedToken == null || !storedToken.IsActive)
-                return Result.Success(); // idempotent
+                return Result.Success();
 
             storedToken.IsRevoked = true;
             storedToken.RevokedByIp = ipAddress;
@@ -246,7 +242,6 @@ namespace Mazaad.Infrastructure.Services.Auth
                 return Result.Failure(result.Errors.Select(e => e.Description));
             }
 
-            // نلغي كل الـ refresh tokens بعد تغيير الباسورد — security best practice
             await RevokeAllUserTokensAsync(userId, "Password changed", ipAddress);
 
             await _securityLog.LogAsync(
@@ -257,6 +252,154 @@ namespace Mazaad.Infrastructure.Services.Auth
                 email: user.Email);
 
             return Result.Success();
+        }
+
+        // ── Forgot Password ───────────────────────────────────────────────────
+        /// <summary>
+        /// بيرجع Success دايمًا (حتى لو الإيميل مش موجود) عشان منكشفش
+        /// إن إيميل معين مسجل في النظام أو لأ (Email Enumeration Protection).
+        /// </summary>
+        public async Task<Result> ForgotPasswordAsync(
+            ForgotPasswordDto dto,
+            string ipAddress)
+        {
+            var user = await _userManager.FindByEmailAsync(dto.Email);
+
+            // مفيش user بهذا الإيميل — نرجع Success برضو من غير ما نبعت حاجة
+            if (user == null || !user.IsActive)
+                return Result.Success();
+
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+
+            var clientBaseUrl = _config["ClientApp:BaseUrl"] ?? "http://localhost:4200";
+            var encodedToken = Uri.EscapeDataString(token);
+            var encodedEmail = Uri.EscapeDataString(user.Email!);
+
+            var resetLink =
+                $"{clientBaseUrl}/reset-password?email={encodedEmail}&token={encodedToken}";
+
+            var htmlBody = BuildResetPasswordEmailBody(user.FullName, resetLink);
+
+            await _emailService.SendEmailAsync(
+                user.Email!,
+                "إعادة تعيين كلمة المرور — Mazzad",
+                htmlBody);
+
+            return Result.Success();
+        }
+
+        // ── Reset Password ────────────────────────────────────────────────────
+        public async Task<Result> ResetPasswordAsync(
+            ResetPasswordDto dto,
+            string ipAddress)
+        {
+            var user = await _userManager.FindByEmailAsync(dto.Email);
+            if (user == null)
+                return Result.Failure("Invalid request.");
+
+            var result = await _userManager.ResetPasswordAsync(
+                user, dto.Token, dto.NewPassword);
+
+            if (!result.Succeeded)
+            {
+                await _securityLog.LogAsync(
+                    SecurityEventType.PasswordChanged,
+                    success: false,
+                    ipAddress: ipAddress,
+                    userId: user.Id,
+                    email: user.Email,
+                    details: "Reset password failed — invalid or expired token");
+
+                return Result.Failure(result.Errors.Select(e => e.Description));
+            }
+
+            // نلغي كل الـ refresh tokens — أي جلسة قديمة لازم تعمل login تاني
+            await RevokeAllUserTokensAsync(user.Id, "Password reset via email link", ipAddress);
+
+            await _securityLog.LogAsync(
+                SecurityEventType.PasswordChanged,
+                success: true,
+                ipAddress: ipAddress,
+                userId: user.Id,
+                email: user.Email,
+                details: "Reset via forgot-password flow");
+
+            return Result.Success();
+        }
+
+        // ── Get My Profile ────────────────────────────────────────────────────
+        public async Task<Result<MyProfileDto>> GetMyProfileAsync(int userId)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+                return Result<MyProfileDto>.Failure("User not found.");
+
+            return Result<MyProfileDto>.Success(new MyProfileDto
+            {
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email!,
+                JobTitle = user.JobTitle,
+                PhoneNumber = user.PhoneNumber,
+                CompanyId = user.CompanyId,
+                TwoFactorEnabled = user.TwoFactorEnabled,
+                LastLoginDate = user.LastLoginDate,
+                ProfilePictureUrl = user.ProfilePictureUrl
+            });
+        }
+
+        // ── Update Profile ────────────────────────────────────────────────────
+        public async Task<Result> UpdateProfileAsync(int userId, UpdateProfileDto dto)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+                return Result.Failure("User not found.");
+
+            user.FullName = dto.FullName;
+            user.JobTitle = dto.JobTitle ?? user.JobTitle;
+            user.PhoneNumber = dto.PhoneNumber;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+                return Result.Failure(result.Errors.Select(e => e.Description));
+
+            return Result.Success();
+        }
+
+        // ── Upload Profile Picture ────────────────────────────────────────────
+        public async Task<Result<string>> UploadProfilePictureAsync(int userId, IFormFile file)
+        {
+            var user = await _userManager.FindByIdAsync(userId.ToString());
+            if (user == null)
+                return Result<string>.Failure("User not found.");
+
+            var uploadPath = Path.Combine("wwwroot", "uploads", "profiles");
+            Directory.CreateDirectory(uploadPath);
+
+            if (!string.IsNullOrEmpty(user.ProfilePictureUrl))
+            {
+                var oldFilePath = Path.Combine("wwwroot", user.ProfilePictureUrl.TrimStart('/'));
+                if (File.Exists(oldFilePath))
+                    File.Delete(oldFilePath);
+            }
+
+            var extension = Path.GetExtension(file.FileName).ToLower();
+            var fileName = $"profile_{userId}_{Guid.NewGuid()}{extension}";
+            var filePath = Path.Combine(uploadPath, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var relativeUrl = $"/uploads/profiles/{fileName}";
+            user.ProfilePictureUrl = relativeUrl;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _userManager.UpdateAsync(user);
+
+            return Result<string>.Success(relativeUrl);
         }
 
         // ── Private Helpers ───────────────────────────────────────────────────
@@ -270,13 +413,11 @@ namespace Mazaad.Infrastructure.Services.Auth
             var accessToken = await _jwtService.GenerateAccessTokenAsync(user, roles);
             var refreshToken = _jwtService.GenerateRefreshToken();
 
-            // حفظ الـ refresh token في الـ DB
             var refreshTokenEntity = new RefreshToken
             {
                 UserId = user.Id,
                 Token = refreshToken,
                 CreatedByIp = ipAddress,
-                // RememberMe → 30 يوم، عادي → 7 أيام
                 ExpiresAt = DateTime.UtcNow.AddDays(rememberMe ? 30 : 7),
                 CreatedAt = DateTime.UtcNow
             };
@@ -320,6 +461,29 @@ namespace Mazaad.Infrastructure.Services.Auth
             }
 
             await _context.SaveChangesAsync();
+        }
+
+        private static string BuildResetPasswordEmailBody(string fullName, string resetLink)
+        {
+            return $@"
+<div style=""font-family: 'Cairo', Tahoma, sans-serif; background:#0a0a0a; padding:32px; direction:rtl;"">
+  <div style=""max-width:480px; margin:0 auto; background:#111111; border:1px solid rgba(201,168,76,0.25); border-radius:12px; padding:32px;"">
+    <h2 style=""color:#c9a84c; margin-bottom:8px;"">إعادة تعيين كلمة المرور</h2>
+    <p style=""color:#ffffff; font-size:14px; line-height:1.8;"">
+      مرحبًا {fullName}،<br/>
+      وصلنا طلب لإعادة تعيين كلمة مرور حسابك في Mazzad. اضغط على الزر بالأسفل لتعيين كلمة مرور جديدة.
+    </p>
+    <div style=""text-align:center; margin:28px 0;"">
+      <a href=""{resetLink}""
+         style=""display:inline-block; background:linear-gradient(135deg,#9a7a2e,#e8c97a); color:#0a0a0a; font-weight:700; padding:12px 32px; border-radius:6px; text-decoration:none;"">
+        إعادة تعيين كلمة المرور
+      </a>
+    </div>
+    <p style=""color:rgba(255,255,255,0.4); font-size:12px; line-height:1.7;"">
+      هذا الرابط صالح لفترة محدودة. لو لم تطلب إعادة تعيين كلمة المرور، يمكنك تجاهل هذا البريد بأمان.
+    </p>
+  </div>
+</div>";
         }
     }
 }

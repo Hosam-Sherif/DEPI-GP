@@ -39,5 +39,8 @@
         UserAddedToCompany = 53,
         UserRemovedFromCompany = 54,
         UserRoleChangedInCompany = 55,
+
+        // ── Profile ──────────────────────────────────────
+        ProfileUpdated = 60,
     }
 }

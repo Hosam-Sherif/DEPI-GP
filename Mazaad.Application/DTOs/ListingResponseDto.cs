@@ -17,5 +17,6 @@ namespace Mazaad.Application.DTOs
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public decimal CurrentHighestBid { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;  // ← ده اللي كان ناقص
     }
 }

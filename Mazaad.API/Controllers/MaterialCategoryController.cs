@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
@@ -16,6 +17,7 @@ namespace Mazaad.API.Controllers
             _categoryService = categoryService;
         }
 
+        // ── مفتوحة للكل — مستخدمة في dropdowns الـ Listings/Inventory ─────────
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -31,14 +33,26 @@ namespace Mazaad.API.Controllers
             return Ok(category);
         }
 
+        // ── خاص بـ SuperAdmin بس — صفحة /admin/material-categories ────────────
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> Create([FromBody] CreateCategoryDto request)
         {
             var createdCategory = await _categoryService.CreateCategoryAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = createdCategory.Id }, createdCategory);
         }
 
+        [HttpPut("{id}")]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> Update(int id, [FromBody] CreateCategoryDto request)
+        {
+            var updated = await _categoryService.UpdateCategoryAsync(id, request);
+            if (updated == null) return NotFound();
+            return Ok(updated);
+        }
+
         [HttpDelete("{id}")]
+        [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> Delete(int id)
         {
             var success = await _categoryService.DeleteCategoryAsync(id);

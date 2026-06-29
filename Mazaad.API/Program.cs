@@ -1,20 +1,33 @@
 // Mazaad.API/Program.cs
 
 using Mazaad.API.Hubs;
-using Mazaad.Infrastructure.Hubs;
-using Mazaad.Application.Interfaces;
-using Mazaad.Application.Interfaces.Repositories;
-using Mazaad.Application.Interfaces.Services;
+using Mazaad.Application.Common;
+using
+Mazaad.Application.Interfaces;
+using
+Mazaad.Application.Interfaces.Repositories;
+using
+Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Enums;
-using Mazaad.Domain.Models;
-using Mazaad.Infrastructure.Persistence;
-using Mazaad.Infrastructure.Persistence.Repositories;
-using Mazaad.Infrastructure.Services;
-using Mazaad.Infrastructure.Services.Auth;
-using Mazaad.Infrastructure.Services.Inventory;
-using Mazaad.Infrastructure.Services.SalesOperations;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
+using
+Mazaad.Domain.Models;
+using Mazaad.Infrastructure.Hubs;
+using
+Mazaad.Infrastructure.Persistence;
+using
+Mazaad.Infrastructure.Persistence.Repositories;
+using
+Mazaad.Infrastructure.Services;
+using
+Mazaad.Infrastructure.Services.Auth;
+using
+Mazaad.Infrastructure.Services.Inventory;
+using
+Mazaad.Infrastructure.Services.SalesOperations;
+using
+Microsoft.AspNetCore.Authentication.JwtBearer;
+using
+Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -24,12 +37,18 @@ namespace Mazaad.API
 {
     public class Program
     {
-        public static async Task Main(string[] args)
+        public static async Task
+Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
 
             // ─── MVC & Swagger ────────────────────────────────────────────────
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.Converters.Add(
+                        new System.Text.Json.Serialization.JsonStringEnumConverter());
+                });
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options =>
             {
@@ -196,12 +215,25 @@ namespace Mazaad.API
             builder.Services.AddScoped<IInventoryService, InventoryService>();
             builder.Services.AddScoped<ISalesOperationsService, SalesOperationsService>();
             builder.Services.AddSingleton<IAuctionPresenceService, AuctionPresenceService>();
-
+            builder.Services.AddScoped<IImageService, CloudinaryImageService>();
+            builder.Services.AddScoped<IProfileService, ProfileService>();
+            // Email settings binding
+            builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+            // Services
+            builder.Services.AddScoped<IEmailService, EmailService>();
+            builder.Services.AddScoped<IContactService, ContactService>();
+            // بعد باقي الـ services
+            builder.Services.AddHostedService<AuctionStatusUpdaterService>();
 
             builder.Services.AddScoped<IEmployeeService, EmployeeService>(); ;
+            // في Program.cs أو ServiceCollectionExtensions — زود السطر ده مع باقي الـ services
+            builder.Services.AddScoped<ICommissionPolicyService, CommissionPolicyService>();
 
             // ─── Build ────────────────────────────────────────────────────────
             var app = builder.Build();
+
+            // ─── Seed Roles (لازم تتنفذ قبل أي Seed تاني بيستخدم AddToRoleAsync) ──
+            await SeedRolesAsync(app);
 
             // ─── Seed SuperAdmin ──────────────────────────────────────────────
             await SeedSuperAdminAsync(app);
@@ -212,12 +244,12 @@ namespace Mazaad.API
             // ─── Pipeline ─────────────────────────────────────────────────────
             //if (app.Environment.IsDevelopment())
             //{
-                app.UseSwagger();
-                app.UseSwaggerUI(o =>
-                {
-                    o.SwaggerEndpoint("/swagger/v1/swagger.json", "Mazaad API v1");
-                    o.RoutePrefix = "swagger";
-                });
+            app.UseSwagger();
+            app.UseSwaggerUI(o =>
+            {
+                o.SwaggerEndpoint("/swagger/v1/swagger.json", "Mazaad API v1");
+                o.RoutePrefix = "swagger";
+            });
             //}
 
             app.UseStaticFiles();
@@ -228,10 +260,35 @@ namespace Mazaad.API
             app.MapControllers();
 
             app.MapHub<ChatHub>("/hubs/chat");
-            app.MapHub<BiddingHub>("/hubs/bidding");
             app.MapHub<AuctionHub>("/hubs/auction");
 
             app.Run();
+        }
+
+        // ── Seed Roles ────────────────────────────────────────────────────────
+        /// <summary>
+        /// بيتأكد إن كل الـ Roles الأساسية موجودة في AspNetRoles.
+        /// Idempotent: بيتشيك RoleExistsAsync قبل ما يعمل Create.
+        /// SuperAdmin / CompanyAdmin → موظفين الشركة من الداخل (التسلسل الإداري).
+        /// CompanyUser → موظف تابع لشركة (يضيفه CompanyAdmin من CompanyUsersController).
+        /// Bidder → مزايد عادي مسجل بنفسه من صفحة Register العامة (مالوش شركة).
+        /// </summary>
+        private static async Task SeedRolesAsync(WebApplication app)
+        {
+            using var scope = app.Services.CreateScope();
+
+            var roleManager = scope.ServiceProvider
+                .GetRequiredService<RoleManager<ApplicationRole>>();
+
+            string[] roles = { "SuperAdmin", "CompanyAdmin", "CompanyUser", "Bidder" };
+
+            foreach (var roleName in roles)
+            {
+                if (!await roleManager.RoleExistsAsync(roleName))
+                {
+                    await roleManager.CreateAsync(new ApplicationRole { Name = roleName });
+                }
+            }
         }
 
         // ── Seed SuperAdmin ───────────────────────────────────────────────────
@@ -426,12 +483,13 @@ namespace Mazaad.API
             if (!await db.InventoryItems.AnyAsync(i => i.company_id == sellerCompany.Id))
             {
                 db.InventoryItems.AddRange(
-                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Bar 12mm",  description = "High-grade construction steel bars", quantity = 500m, unit_of_measure = "Ton", minimum_auction_price = 750m, current_market_price = 900m, status = InventoryItemStatus.Available, created_at = now.AddMonths(-6), updated_at = now },
-                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Plate 5mm", description = "Flat steel plates for fabrication",  quantity = 200m, unit_of_measure = "Ton", minimum_auction_price = 800m, current_market_price = 950m, status = InventoryItemStatus.InAuction, created_at = now.AddMonths(-3), updated_at = now },
-                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Coil",      description = "Cold-rolled steel coil",            quantity = 300m, unit_of_measure = "Ton", minimum_auction_price = 700m, current_market_price = 850m, status = InventoryItemStatus.Sold,      created_at = now.AddMonths(-5), updated_at = now }
+                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Bar 12mm", description = "High-grade construction steel bars", quantity = 500m, unit_of_measure = "Ton", minimum_auction_price = 750m, current_market_price = 900m, status = InventoryItemStatus.Available, created_at = now.AddMonths(-6), updated_at = now },
+                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Plate 5mm", description = "Flat steel plates for fabrication", quantity = 200m, unit_of_measure = "Ton", minimum_auction_price = 800m, current_market_price = 950m, status = InventoryItemStatus.InAuction, created_at = now.AddMonths(-3), updated_at = now },
+                    new InventoryItem { company_id = sellerCompany.Id, category_id = category.Id, name = "Steel Coil", description = "Cold-rolled steel coil", quantity = 300m, unit_of_measure = "Ton", minimum_auction_price = 700m, current_market_price = 850m, status = InventoryItemStatus.Sold, created_at = now.AddMonths(-5), updated_at = now }
                 );
                 await db.SaveChangesAsync();
             }
         }
     }
+
 }

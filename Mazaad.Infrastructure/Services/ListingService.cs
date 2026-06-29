@@ -7,6 +7,7 @@ using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Enums;
 using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mazaad.Infrastructure.Services
@@ -14,76 +15,28 @@ namespace Mazaad.Infrastructure.Services
     public class ListingService : IListingService
     {
         private readonly AppDbContext _context;
+        private readonly IImageService _imageService;
 
-        public ListingService(AppDbContext context)
+        public ListingService(AppDbContext context, IImageService imageService)
         {
             _context = context;
+            _imageService = imageService;
         }
 
         // ─── Marketplace Grid ──────────────────────────────────────────────────────
 
         public async Task<PagedResultDto<ListingCardDto>> GetListingsAsync(ListingFilterDto filter)
         {
-            var query = _context.Listings
-                .Include(l => l.Category)
-                .Include(l => l.Company)
-                .Where(l => !l.IsDeleted);
+            var query = BuildFilteredQuery(filter);
+            return await ToPagedCardResultAsync(query, filter.PageNumber, filter.PageSize);
+        }
 
-            // Apply filters
-            if (filter.CategoryId.HasValue)
-                query = query.Where(l => l.CategoryId == filter.CategoryId.Value);
+        // ─── Dashboard: My Listings ────────────────────────────────────────────────
 
-            if (filter.Condition.HasValue)
-                query = query.Where(l => l.Condition == filter.Condition.Value);
-
-            if (filter.Status.HasValue)
-                query = query.Where(l => l.Status == filter.Status.Value);
-
-            if (filter.MinPrice.HasValue)
-                query = query.Where(l => l.CurrentHighestBid >= filter.MinPrice.Value);
-
-            if (filter.MaxPrice.HasValue)
-                query = query.Where(l => l.CurrentHighestBid <= filter.MaxPrice.Value);
-
-            if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
-            {
-                var term = filter.SearchTerm.Trim().ToLower();
-                query = query.Where(l =>
-                    l.Title.ToLower().Contains(term) ||
-                    l.Description.ToLower().Contains(term));
-            }
-
-            var totalCount = await query.CountAsync();
-
-            var items = await query
-                .OrderByDescending(l => l.CreatedAt)
-                .Skip((filter.PageNumber - 1) * filter.PageSize)
-                .Take(filter.PageSize)
-                .Select(l => new ListingCardDto
-                {
-                    Id = l.Id,
-                    Title = l.Title,
-                    Description = l.Description,
-                    ImageUrl = l.ImageUrl,
-                    CategoryName = l.Category.CategoryName,
-                    CompanyName = l.Company.CompanyName,
-                    CurrentHighestBid = l.CurrentHighestBid,
-                    BidCount = l.BidCount,
-                    Status = l.Status,
-                    Condition = l.Condition,
-                    BaseCurrency = l.BaseCurrency,
-                    UnitOfMeasure = l.UnitOfMeasure,
-                    EndDate = l.EndDate
-                })
-                .ToListAsync();
-
-            return new PagedResultDto<ListingCardDto>
-            {
-                Items = items,
-                TotalCount = totalCount,
-                PageNumber = filter.PageNumber,
-                PageSize = filter.PageSize
-            };
+        public async Task<PagedResultDto<ListingCardDto>> GetMyListingsAsync(int companyId, ListingFilterDto filter)
+        {
+            var query = BuildFilteredQuery(filter, companyId);
+            return await ToPagedCardResultAsync(query, filter.PageNumber, filter.PageSize);
         }
 
         // ─── Single Listing Summary ────────────────────────────────────────────────
@@ -133,6 +86,10 @@ namespace Mazaad.Infrastructure.Services
                 DueDiligenceUrls = listing.DueDiligenceUrls,
                 StartDate = listing.StartDate,
                 EndDate = listing.EndDate,
+                WinningBidId = listing.Bids
+                    .OrderByDescending(b => b.BidAmountPerUnit)
+                    .Select(b => (int?)b.Id)
+                    .FirstOrDefault(),
                 TopBids = listing.Bids.Select(b => new BidDetailDto
                 {
                     Id = b.Id,
@@ -153,7 +110,6 @@ namespace Mazaad.Infrastructure.Services
 
         public async Task<ListingResponseDto> CreateListingAsync(int companyId, CreateListingDto request)
         {
-            // Inherit UnitOfMeasure from the material category
             var category = await _context.MaterialCategories.FindAsync(request.CategoryId);
             var unitOfMeasure = category?.UnitOfMeasure ?? request.UnitOfMeasure ?? "kg";
 
@@ -171,6 +127,7 @@ namespace Mazaad.Infrastructure.Services
                 StartDate = request.StartDate,
                 EndDate = request.EndDate,
                 CurrentHighestBid = request.StartingPrice,
+                ImageUrl = "",
                 Status = request.StartDate > DateTime.UtcNow ? ListingStatus.Upcoming : ListingStatus.Active,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
@@ -192,7 +149,6 @@ namespace Mazaad.Infrastructure.Services
             if (listing == null || listing.IsDeleted || listing.CompanyId != companyId)
                 return null;
 
-            // Inherit UnitOfMeasure from the category if the category changes
             var category = await _context.MaterialCategories.FindAsync(request.CategoryId);
             var unitOfMeasure = category?.UnitOfMeasure ?? listing.UnitOfMeasure;
 
@@ -208,6 +164,31 @@ namespace Mazaad.Infrastructure.Services
             listing.EndDate = request.EndDate;
             listing.UpdatedAt = DateTime.UtcNow;
 
+            await _context.SaveChangesAsync();
+
+            return MapToResponseDto(listing);
+        }
+
+        // ─── Upload Image ─────────────────────────────────────────────────────────
+
+        public async Task<ListingResponseDto?> UploadListingImageAsync(int listingId, int companyId, IFormFile image)
+        {
+            var listing = await _context.Listings
+                .FirstOrDefaultAsync(l => l.Id == listingId
+                                       && l.CompanyId == companyId
+                                       && !l.IsDeleted);
+
+            if (listing == null) return null;
+
+            using var stream = image.OpenReadStream();
+            var imageUrl = await _imageService.UploadImageAsync(
+                stream,
+                image.FileName,
+                $"mazzad/listings/{companyId}"
+            );
+
+            listing.ImageUrl = imageUrl;
+            listing.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
             return MapToResponseDto(listing);
@@ -229,7 +210,110 @@ namespace Mazaad.Infrastructure.Services
             return true;
         }
 
+        // ─── Cancel Listing ───────────────────────────────────────────────────────
+
+        public async Task<bool> CancelListingAsync(int id, int companyId)
+        {
+            var listing = await _context.Listings.FindAsync(id);
+
+            if (listing == null || listing.IsDeleted || listing.CompanyId != companyId)
+                return false;
+
+            if (listing.Status == ListingStatus.Cancelled)
+                return false;
+
+            listing.Status = ListingStatus.Cancelled;
+            listing.UpdatedAt = DateTime.UtcNow;
+
+            // إلغاء كل الـ bids المرتبطة بالـ listing
+            var bids = await _context.Bids
+                .Where(b => b.ListingId == id && b.Status != BidStatus.Cancelled)
+                .ToListAsync();
+
+            foreach (var bid in bids)
+                bid.Status = BidStatus.Cancelled;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
         // ─── Private Helpers ──────────────────────────────────────────────────────
+
+        private IQueryable<Listings> BuildFilteredQuery(ListingFilterDto filter, int? companyId = null)
+        {
+            var query = _context.Listings
+                .Include(l => l.Category)
+                .Include(l => l.Company)
+                .Where(l => !l.IsDeleted);
+
+            if (companyId.HasValue)
+                query = query.Where(l => l.CompanyId == companyId.Value);
+
+            if (filter.CategoryId.HasValue)
+                query = query.Where(l => l.CategoryId == filter.CategoryId.Value);
+
+            if (filter.Condition.HasValue)
+                query = query.Where(l => l.Condition == filter.Condition.Value);
+
+            if (filter.Status.HasValue)
+                query = query.Where(l => l.Status == filter.Status.Value);
+
+            if (filter.MinPrice.HasValue)
+                query = query.Where(l => l.CurrentHighestBid >= filter.MinPrice.Value);
+
+            if (filter.MaxPrice.HasValue)
+                query = query.Where(l => l.CurrentHighestBid <= filter.MaxPrice.Value);
+
+            if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
+            {
+                var term = filter.SearchTerm.Trim().ToLower();
+                query = query.Where(l =>
+                    l.Title.ToLower().Contains(term) ||
+                    l.Description.ToLower().Contains(term));
+            }
+
+            return query;
+        }
+
+        private static async Task<PagedResultDto<ListingCardDto>> ToPagedCardResultAsync(
+            IQueryable<Listings> query, int pageNumber, int pageSize)
+        {
+            var totalCount = await query.CountAsync();
+
+            var items = await query
+                .OrderByDescending(l => l.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(l => new ListingCardDto
+                {
+                    Id = l.Id,
+                    Title = l.Title,
+                    Description = l.Description,
+                    ImageUrl = l.ImageUrl,
+                    CategoryName = l.Category.CategoryName,
+                    CompanyName = l.Company.CompanyName,
+                    CurrentHighestBid = l.CurrentHighestBid,
+                    BidCount = l.BidCount,
+                    Status = l.Status,
+                    Condition = l.Condition,
+                    BaseCurrency = l.BaseCurrency,
+                    UnitOfMeasure = l.UnitOfMeasure,
+                    EndDate = l.EndDate,
+                    WinningBidId = l.Bids
+                        .OrderByDescending(b => b.BidAmountPerUnit)
+                        .Select(b => (int?)b.Id)
+                        .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            return new PagedResultDto<ListingCardDto>
+            {
+                Items = items,
+                TotalCount = totalCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+        }
 
         private static ListingResponseDto MapToResponseDto(Listings listing) => new ListingResponseDto
         {
@@ -245,7 +329,8 @@ namespace Mazaad.Infrastructure.Services
             BaseCurrency = listing.BaseCurrency,
             StartDate = listing.StartDate,
             EndDate = listing.EndDate,
-            CurrentHighestBid = listing.CurrentHighestBid
+            CurrentHighestBid = listing.CurrentHighestBid,
+            ImageUrl = listing.ImageUrl
         };
     }
 }

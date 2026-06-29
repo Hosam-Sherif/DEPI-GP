@@ -7,8 +7,9 @@ namespace Mazaad.Application.Interfaces.Services
     public interface IMaterialCategoryService
     {
         Task<IEnumerable<CategoryResponseDto>> GetAllCategoriesAsync();
-        Task<CategoryResponseDto> GetCategoryByIdAsync(int id);
+        Task<CategoryResponseDto?> GetCategoryByIdAsync(int id);
         Task<CategoryResponseDto> CreateCategoryAsync(CreateCategoryDto request);
+        Task<CategoryResponseDto?> UpdateCategoryAsync(int id, CreateCategoryDto request);
         Task<bool> DeleteCategoryAsync(int id);
     }
 }

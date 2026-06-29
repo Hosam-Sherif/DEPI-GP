@@ -21,6 +21,9 @@ namespace Mazaad.Domain.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        /// <summary>Relative URL to the user's profile picture, e.g. /uploads/profiles/xyz.jpg</summary>
+        public string? ProfilePictureUrl { get; set; }
+
         // Navigation
         public Companies? Company { get; set; }
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new HashSet<RefreshToken>();

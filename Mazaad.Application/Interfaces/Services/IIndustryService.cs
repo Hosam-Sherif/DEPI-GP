@@ -9,6 +9,7 @@ namespace Mazaad.Application.Interfaces.Services
         Task<IEnumerable<IndustryResponseDto>> GetAllIndustriesAsync();
         Task<IndustryResponseDto?> GetIndustryByIdAsync(int id);
         Task<IndustryResponseDto> CreateIndustryAsync(CreateIndustryDto request);
+        Task<IndustryResponseDto?> UpdateIndustryAsync(int id, UpdateIndustryDto request);
         Task<bool> DeleteIndustryAsync(int id);
     }
 }

@@ -6,7 +6,9 @@ using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Enums;
 using Mazaad.Domain.Models;
+using Mazaad.Infrastructure.Hubs;
 using Mazaad.Infrastructure.Persistence;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mazaad.Infrastructure.Services
@@ -15,19 +17,28 @@ namespace Mazaad.Infrastructure.Services
     {
         private readonly AppDbContext _context;
         private readonly INotificationService _notificationService;
+        private readonly IHubContext<AuctionHub> _hubContext;
 
         public BiddingService(
             AppDbContext context,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IHubContext<AuctionHub> hubContext)
         {
             _context = context;
             _notificationService = notificationService;
+            _hubContext = hubContext;
         }
 
         // ─── Place Full Bid ───────────────────────────────────────────────────────
 
         public async Task<BidResultDto> PlaceBidAsync(int userId, int companyId, PlaceBidDto request)
         {
+            if (request.BidAmountPerUnit <= 0)
+                return Fail("Bid amount must be greater than zero.");
+
+            if (request.Quantity <= 0)
+                return Fail("Quantity must be greater than zero.");
+
             var listing = await _context.Listings.FindAsync(request.ListingId);
 
             if (listing == null)
@@ -48,14 +59,14 @@ namespace Mazaad.Infrastructure.Services
             if (request.BidAmountPerUnit <= listing.CurrentHighestBid)
                 return Fail("Your bid must exceed the current highest bid.");
 
-            // Mark previous active bids for this listing as Outbid
-            var previousBids = await _context.Bids
+            var serverComputedTotal = request.BidAmountPerUnit * request.Quantity;
+
+            var previousActiveBids = await _context.Bids
                 .Where(b => b.ListingId == request.ListingId && b.Status == BidStatus.Active)
                 .ToListAsync();
-            foreach (var prev in previousBids)
+            foreach (var prev in previousActiveBids)
                 prev.Status = BidStatus.Outbid;
 
-            // Update listing
             listing.CurrentHighestBid = request.BidAmountPerUnit;
             listing.BidCount++;
             if (listing.Status == ListingStatus.Upcoming)
@@ -67,7 +78,7 @@ namespace Mazaad.Infrastructure.Services
                 BuyerCompanyId = companyId,
                 PlacedByUserId = userId,
                 BidAmountPerUnit = request.BidAmountPerUnit,
-                TotalBidAmount = request.BidAmountPerUnit * request.Quantity,
+                TotalBidAmount = serverComputedTotal,
                 Quantity = request.Quantity,
                 IsAnonymous = request.IsAnonymous,
                 Status = BidStatus.Active,
@@ -83,8 +94,7 @@ namespace Mazaad.Infrastructure.Services
                 var company = await _context.Companies.FindAsync(companyId);
                 var displayName = request.IsAnonymous ? "Anonymous" : (company?.CompanyName ?? "Unknown");
 
-                // Notify the previous bid owner they were outbid
-                foreach (var prev in previousBids)
+                foreach (var prev in previousActiveBids)
                 {
                     await _notificationService.CreateNotificationAsync(
                         prev.PlacedByUserId,
@@ -110,16 +120,17 @@ namespace Mazaad.Infrastructure.Services
             }
         }
 
-        // ─── Quick Bid (from Marketplace Card) ───────────────────────────────────
+        // ─── Quick Bid ────────────────────────────────────────────────────────────
 
         public async Task<BidResultDto> PlaceQuickBidAsync(int userId, int companyId, QuickBidDto request)
         {
+            if (request.BidAmountPerUnit <= 0)
+                return Fail("Bid amount must be greater than zero.");
+
             var listing = await _context.Listings.FindAsync(request.ListingId);
             if (listing == null)
                 return Fail("Listing not found.");
 
-            // Use the top (current winning) bid's quantity.
-            // Falls back to MinOrderQuantity if no bids have been placed yet.
             var topBid = await _context.Bids
                 .Where(b => b.ListingId == request.ListingId && b.Status == BidStatus.Active)
                 .OrderByDescending(b => b.BidAmountPerUnit)
@@ -131,7 +142,6 @@ namespace Mazaad.Infrastructure.Services
             {
                 ListingId = request.ListingId,
                 BidAmountPerUnit = request.BidAmountPerUnit,
-                TotalBidAmount = request.BidAmountPerUnit * quantity,
                 Quantity = quantity,
                 IsAnonymous = request.IsAnonymous
             };
@@ -139,7 +149,7 @@ namespace Mazaad.Infrastructure.Services
             return await PlaceBidAsync(userId, companyId, fullBid);
         }
 
-        // ─── Get Bids (basic result) ──────────────────────────────────────────────
+        // ─── Get Bids for Listing ─────────────────────────────────────────────────
 
         public async Task<IEnumerable<BidResultDto>> GetBidsForListingAsync(int listingId)
         {
@@ -158,13 +168,13 @@ namespace Mazaad.Infrastructure.Services
             });
         }
 
-        // ─── Live Bids (full detail for bidding room) ─────────────────────────────
+        // ─── Live Bids ────────────────────────────────────────────────────────────
 
         public async Task<IEnumerable<BidDetailDto>> GetLiveBidsAsync(int listingId)
         {
             var bids = await _context.Bids
                 .Include(b => b.BuyerCompany)
-                .Where(b => b.ListingId == listingId)
+                .Where(b => b.ListingId == listingId && b.Status != BidStatus.Cancelled)
                 .OrderByDescending(b => b.BidAmountPerUnit)
                 .Take(10)
                 .ToListAsync();
@@ -183,6 +193,39 @@ namespace Mazaad.Infrastructure.Services
             return bid == null ? null : MapToBidDetailDto(bid);
         }
 
+        // ─── My Bids (by company) ─────────────────────────────────────────────────
+
+        public async Task<IEnumerable<BidDetailDto>> GetBidsByCompanyAsync(int companyId)
+        {
+            var bids = await _context.Bids
+                .Include(b => b.BuyerCompany)
+                .Include(b => b.Listing)
+                .Where(b => b.BuyerCompanyId == companyId)
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync();
+
+            return bids.Select(b =>
+            {
+                var dto = MapToBidDetailDto(b);
+
+                var isHighestBid = b.Listing != null &&
+                                   b.Listing.CurrentHighestBid == b.BidAmountPerUnit;
+
+                // فاز: المزاد خلص (Status = Ended) وهو الأعلى
+                if (isHighestBid && b.Listing!.Status == ListingStatus.Ended)
+                {
+                    dto.Status = BidStatus.Won;
+                }
+                // في الصدارة: المزاد لسه شغال وهو الأعلى
+                else if (isHighestBid && b.Listing!.Status == ListingStatus.Active)
+                {
+                    dto.Status = BidStatus.Winning;
+                }
+
+                return dto;
+            });
+        }
+
         // ─── Delete / Cancel Bid ──────────────────────────────────────────────────
 
         public async Task<bool> DeleteBidAsync(int bidId, int companyId)
@@ -192,8 +235,51 @@ namespace Mazaad.Infrastructure.Services
             if (bid == null || bid.BuyerCompanyId != companyId)
                 return false;
 
+            if (bid.Status == BidStatus.Cancelled)
+                return false;
+
+            var wasActiveTopBid = bid.Status == BidStatus.Active;
             bid.Status = BidStatus.Cancelled;
+
+            var listing = await _context.Listings.FindAsync(bid.ListingId);
+
+            if (wasActiveTopBid && listing != null)
+            {
+                var nextTopBid = await _context.Bids
+                    .Where(b => b.ListingId == bid.ListingId
+                             && b.Id != bid.Id
+                             && b.Status == BidStatus.Outbid)
+                    .OrderByDescending(b => b.BidAmountPerUnit)
+                    .FirstOrDefaultAsync();
+
+                if (nextTopBid != null)
+                {
+                    nextTopBid.Status = BidStatus.Active;
+                    listing.CurrentHighestBid = nextTopBid.BidAmountPerUnit;
+                }
+                else
+                {
+                    listing.CurrentHighestBid = 0;
+                }
+            }
+
             await _context.SaveChangesAsync();
+
+            if (listing != null)
+            {
+                var liveBids = await GetLiveBidsAsync(listing.Id);
+
+                await _hubContext.Clients
+                    .Group($"auction-{listing.Id}")
+                    .SendAsync("BidCancelled", new
+                    {
+                        ListingId = listing.Id,
+                        CancelledBidId = bid.Id,
+                        NewHighestBid = listing.CurrentHighestBid,
+                        LiveBids = liveBids
+                    });
+            }
+
             return true;
         }
 

@@ -53,6 +53,21 @@ namespace Mazaad.Infrastructure.Services
             return MapToDto(industry);
         }
 
+        public async Task<IndustryResponseDto?> UpdateIndustryAsync(int id, UpdateIndustryDto request)
+        {
+            var industry = await _context.IndustryTypes
+                .FirstOrDefaultAsync(i => i.Id == id && !i.IsDeleted);
+
+            if (industry == null) return null;
+
+            industry.IndustryName = request.IndustryName;
+            industry.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return MapToDto(industry);
+        }
+
         public async Task<bool> DeleteIndustryAsync(int id)
         {
             var industry = await _context.IndustryTypes.FindAsync(id);

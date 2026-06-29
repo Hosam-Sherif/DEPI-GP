@@ -2,6 +2,7 @@
 
 using Mazaad.Application.Common;
 using Mazaad.Application.DTOs.Auth;
+using Microsoft.AspNetCore.Http;
 
 namespace Mazaad.Application.Interfaces.Services
 {
@@ -21,5 +22,20 @@ namespace Mazaad.Application.Interfaces.Services
 
         // ── تغيير كلمة المرور ────────────────────────────
         Task<Result> ChangePasswordAsync(int userId, ChangePasswordDto dto, string ipAddress);
+
+        // ── طلب رابط استعادة كلمة المرور (نسيت كلمة المرور) ──
+        Task<Result> ForgotPasswordAsync(ForgotPasswordDto dto, string ipAddress);
+
+        // ── تعيين كلمة مرور جديدة عبر الـ Token ─────────
+        Task<Result> ResetPasswordAsync(ResetPasswordDto dto, string ipAddress);
+
+        // ── بيانات الـ profile ───────────────────────────
+        Task<Result<MyProfileDto>> GetMyProfileAsync(int userId);
+
+        // ── تعديل بيانات الـ profile ─────────────────────
+        Task<Result> UpdateProfileAsync(int userId, UpdateProfileDto dto);
+
+        // ── رفع صورة الـ profile ──────────────────────────
+        Task<Result<string>> UploadProfilePictureAsync(int userId, IFormFile file);
     }
 }

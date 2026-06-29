@@ -9,7 +9,7 @@ namespace Mazaad.API.Controllers
 {
     [ApiController]
     [Route("api/companies/{companyId}/users")]
-    //[Authorize(Roles = "CompanyAdmin,SuperAdmin")]
+    [Authorize(Roles = "CompanyAdmin,SuperAdmin")]
     public class CompanyUsersController : ControllerBase
     {
         private readonly ICompanyUserService _companyUserService;
@@ -95,7 +95,6 @@ namespace Mazaad.API.Controllers
         /// <summary>
         /// الحصول على بيانات يوزر معين داخل الشركة.
         /// </summary>
-        
         [HttpGet("{userId}")]
         public async Task<IActionResult> GetUserById(int companyId, int userId)
         {
@@ -109,7 +108,7 @@ namespace Mazaad.API.Controllers
 
             return Ok(user);
         }
-        
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         /// <summary>
@@ -130,5 +129,4 @@ namespace Mazaad.API.Controllers
                 ? forwarded.ToString()
                 : HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
-
 }

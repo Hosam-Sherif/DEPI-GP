@@ -48,6 +48,7 @@ namespace Mazaad.Domain.Models
         public ListingCondition Condition { get; set; } = ListingCondition.New;
 
         /// <summary>Primary image URL for the marketplace card</summary>
+        [Column("image_url")]
         [MaxLength(500)]
         public string ImageUrl { get; set; } = string.Empty;
 
@@ -72,7 +73,5 @@ namespace Mazaad.Domain.Models
 
         [Timestamp]
         public byte[] RowVersion { get; set; } = Array.Empty<byte>();
-
-        public string? image_url { get; set; }
     }
 }

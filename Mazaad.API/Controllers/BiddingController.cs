@@ -32,8 +32,7 @@ namespace Mazaad.API.Controllers
         /// Place secure auction bid
         /// </summary>
         [HttpPost("place-bid")]
-        public async Task<IActionResult> PlaceBid(
-            [FromBody] PlaceBidDto request)
+        public async Task<IActionResult> PlaceBid([FromBody] PlaceBidDto request)
         {
             try
             {
@@ -43,22 +42,11 @@ namespace Mazaad.API.Controllers
                 if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
                     return Unauthorized(new { success = false, message = "Only verified company users can place bids." });
 
-                var result =
-                    await _biddingService.PlaceBidAsync(
-                        userId,
-                        companyId,
-                        request);
+                var result = await _biddingService.PlaceBidAsync(userId, companyId, request);
 
                 if (!result.Success)
-                {
-                    return BadRequest(new
-                    {
-                        success = false,
-                        message = result.Message
-                    });
-                }
+                    return BadRequest(new { success = false, message = result.Message });
 
-                // Realtime broadcast
                 var liveUpdate = new LiveBidUpdateDto
                 {
                     ListingId = request.ListingId,
@@ -73,33 +61,14 @@ namespace Mazaad.API.Controllers
                     .Group($"auction-{request.ListingId}")
                     .SendAsync("BidPlaced", liveUpdate);
 
-                // Also notify BiddingHub clients (group: listing-{id})
-                await _hubContext.Clients
-                    .Group($"listing-{request.ListingId}")
-                    .SendAsync("BidPlaced", liveUpdate);
+                _logger.LogInformation("Bid placed successfully on listing {ListingId}", request.ListingId);
 
-                _logger.LogInformation(
-                    "Bid placed successfully on listing {ListingId}",
-                    request.ListingId);
-
-                return Ok(new
-                {
-                    success = true,
-                    message = "Bid placed successfully.",
-                    data = result
-                });
+                return Ok(new { success = true, message = "Bid placed successfully.", data = result });
             }
             catch (Exception ex)
             {
-                _logger.LogError(
-                    ex,
-                    "Error while placing bid");
-
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "Internal server error."
-                });
+                _logger.LogError(ex, "Error while placing bid");
+                return StatusCode(500, new { success = false, message = "Internal server error." });
             }
         }
 
@@ -111,8 +80,7 @@ namespace Mazaad.API.Controllers
         /// Quick predefined increment bid
         /// </summary>
         [HttpPost("quick-bid")]
-        public async Task<IActionResult> QuickBid(
-            [FromBody] QuickBidDto request)
+        public async Task<IActionResult> QuickBid([FromBody] QuickBidDto request)
         {
             try
             {
@@ -122,20 +90,10 @@ namespace Mazaad.API.Controllers
                 if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
                     return Unauthorized(new { success = false, message = "Only verified company users can place quick bids." });
 
-                var result =
-                    await _biddingService.PlaceQuickBidAsync(
-                        userId,
-                        companyId,
-                        request);
+                var result = await _biddingService.PlaceQuickBidAsync(userId, companyId, request);
 
                 if (!result.Success)
-                {
-                    return BadRequest(new
-                    {
-                        success = false,
-                        message = result.Message
-                    });
-                }
+                    return BadRequest(new { success = false, message = result.Message });
 
                 var liveUpdate = new LiveBidUpdateDto
                 {
@@ -151,23 +109,12 @@ namespace Mazaad.API.Controllers
                     .Group($"auction-{request.ListingId}")
                     .SendAsync("BidPlaced", liveUpdate);
 
-                return Ok(new
-                {
-                    success = true,
-                    data = result
-                });
+                return Ok(new { success = true, data = result });
             }
             catch (Exception ex)
             {
-                _logger.LogError(
-                    ex,
-                    "Error while placing quick bid");
-
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "Internal server error."
-                });
+                _logger.LogError(ex, "Error while placing quick bid");
+                return StatusCode(500, new { success = false, message = "Internal server error." });
             }
         }
 
@@ -182,10 +129,7 @@ namespace Mazaad.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetListingBids(int listingId)
         {
-            var bids =
-                await _biddingService
-                    .GetBidsForListingAsync(listingId);
-
+            var bids = await _biddingService.GetBidsForListingAsync(listingId);
             return Ok(bids);
         }
 
@@ -196,10 +140,7 @@ namespace Mazaad.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetLiveBids(int listingId)
         {
-            var liveBids =
-                await _biddingService
-                    .GetLiveBidsAsync(listingId);
-
+            var liveBids = await _biddingService.GetLiveBidsAsync(listingId);
             return Ok(liveBids);
         }
 
@@ -210,19 +151,25 @@ namespace Mazaad.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetBidDetails(int bidId)
         {
-            var bid =
-                await _biddingService
-                    .GetBidDetailAsync(bidId);
+            var bid = await _biddingService.GetBidDetailAsync(bidId);
 
             if (bid == null)
-            {
-                return NotFound(new
-                {
-                    message = "Bid not found."
-                });
-            }
+                return NotFound(new { message = "Bid not found." });
 
             return Ok(bid);
+        }
+
+        /// <summary>
+        /// Get all bids placed by the current authenticated company
+        /// </summary>
+        [HttpGet("my-bids")]
+        public async Task<IActionResult> GetMyBids()
+        {
+            if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
+                return Unauthorized(new { success = false, message = "Only verified company users can view their bids." });
+
+            var bids = await _biddingService.GetBidsByCompanyAsync(companyId);
+            return Ok(bids);
         }
 
         #endregion
@@ -233,24 +180,15 @@ namespace Mazaad.API.Controllers
         /// Cancel bid
         /// </summary>
         [HttpDelete("{bidId}")]
-        public async Task<IActionResult> DeleteBid(
-            int bidId)
+        public async Task<IActionResult> DeleteBid(int bidId)
         {
             if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
                 return Unauthorized(new { success = false, message = "Only verified company users can cancel bids." });
 
-            var success =
-                await _biddingService
-                    .DeleteBidAsync(bidId, companyId);
+            var success = await _biddingService.DeleteBidAsync(bidId, companyId);
 
             if (!success)
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    message = "Unable to cancel bid."
-                });
-            }
+                return BadRequest(new { success = false, message = "Unable to cancel bid." });
 
             return NoContent();
         }

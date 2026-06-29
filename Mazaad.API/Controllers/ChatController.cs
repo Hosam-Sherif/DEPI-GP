@@ -10,6 +10,7 @@ namespace Mazaad.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class ChatController : ControllerBase
     {
         private readonly IChatService _chatService;
@@ -25,27 +26,31 @@ namespace Mazaad.API.Controllers
 
         /// <summary>
         /// Start or retrieve an existing chat channel between buyer and seller for a listing.
-        /// Returns { channelId } on success.
-        /// Note: buyerCompanyId and sellerCompanyId must be valid company IDs in the database.
+        /// Only members of the buyer company can initiate a chat.
         /// </summary>
         [HttpPost("start")]
         public async Task<IActionResult> StartChat(
             [FromQuery] int listingId,
-            [FromQuery] int buyerCompanyId,
             [FromQuery] int sellerCompanyId)
         {
+            var companyId = GetCurrentCompanyId();
+            if (companyId == null)
+                return Unauthorized(new { error = "A valid company account is required." });
+
+            // الشركة الحالية هي الـ buyer تلقائياً
+            if (companyId.Value == sellerCompanyId)
+                return BadRequest(new { error = "Cannot start a chat with your own listing." });
+
             var channelId = await _chatService.CreateOrGetChannelAsync(
-                listingId, buyerCompanyId, sellerCompanyId);
+                listingId, companyId.Value, sellerCompanyId);
 
             return Ok(new { channelId });
         }
 
         /// <summary>
         /// Get all chat channels for the current user's company.
-        /// Returns a summary list with last message preview and channel metadata.
         /// </summary>
         [HttpGet("my-channels")]
-        [Authorize]
         public async Task<IActionResult> GetMyChannels()
         {
             var companyId = GetCurrentCompanyId();
@@ -57,46 +62,76 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>
-        /// Get detail for a single chat channel (includes listing title, company names, status).
+        /// Get detail for a single chat channel.
+        /// Only buyer or seller of the channel can view it.
         /// </summary>
         [HttpGet("{channelId}")]
         public async Task<IActionResult> GetChannelDetail(int channelId)
         {
+            var companyId = GetCurrentCompanyId();
+            if (companyId == null)
+                return Unauthorized(new { error = "A valid company account is required." });
+
             var channel = await _chatService.GetChannelDetailAsync(channelId);
-            if (channel == null) return NotFound(new { error = "Channel not found." });
+            if (channel == null)
+                return NotFound(new { error = "Channel not found." });
+
+            // ownership check
+            if (channel.BuyerCompanyId != companyId.Value && channel.SellerCompanyId != companyId.Value)
+                return Forbid();
+
             return Ok(channel);
         }
 
         /// <summary>
-        /// Get all messages in a channel ordered by time (oldest first).
+        /// Get all messages in a channel ordered by time.
+        /// Only buyer or seller of the channel can view history.
         /// </summary>
         [HttpGet("{channelId}/history")]
         public async Task<IActionResult> GetHistory(int channelId)
         {
+            var companyId = GetCurrentCompanyId();
+            if (companyId == null)
+                return Unauthorized(new { error = "A valid company account is required." });
+
+            // ownership check عن طريق channel detail
+            var channel = await _chatService.GetChannelDetailAsync(channelId);
+            if (channel == null)
+                return NotFound(new { error = "Channel not found." });
+
+            if (channel.BuyerCompanyId != companyId.Value && channel.SellerCompanyId != companyId.Value)
+                return Forbid();
+
             var messages = await _chatService.GetChannelHistoryAsync(channelId);
             return Ok(messages);
         }
 
         /// <summary>
-        /// Send a message via REST. Saves the message to the database and then
-        /// broadcasts it via SignalR to all connected clients in the channel group.
-        /// Requires authentication. The senderUserId is extracted from the JWT token.
+        /// Send a message via REST + broadcast via SignalR.
+        /// Only buyer or seller of the channel can send messages.
         /// </summary>
         [HttpPost("{channelId}/messages")]
-        [Authorize]
         public async Task<IActionResult> SendMessage(int channelId, [FromBody] SendMessageDto request)
         {
             var userId = GetCurrentUserId();
-            if (userId == null)
+            var companyId = GetCurrentCompanyId();
+
+            if (userId == null || companyId == null)
                 return Unauthorized(new { error = "Invalid user token." });
 
             if (string.IsNullOrWhiteSpace(request.MessageText))
                 return BadRequest(new { error = "Message text cannot be empty." });
 
-            // Save to DB
+            // ownership check
+            var channel = await _chatService.GetChannelDetailAsync(channelId);
+            if (channel == null)
+                return NotFound(new { error = "Channel not found." });
+
+            if (channel.BuyerCompanyId != companyId.Value && channel.SellerCompanyId != companyId.Value)
+                return Forbid();
+
             var saved = await _chatService.SaveMessageAsync(channelId, userId.Value, request.MessageText);
 
-            // Broadcast to all SignalR clients in this channel's group
             await _chatHubContext.Clients
                 .Group(channelId.ToString())
                 .SendAsync("ReceiveMessage", saved);
@@ -105,10 +140,9 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>
-        /// Close a chat channel. Only members of the buyer or seller company can close it.
+        /// Close a chat channel. Only buyer or seller can close it.
         /// </summary>
         [HttpDelete("{channelId}")]
-        [Authorize]
         public async Task<IActionResult> CloseChannel(int channelId)
         {
             var companyId = GetCurrentCompanyId();

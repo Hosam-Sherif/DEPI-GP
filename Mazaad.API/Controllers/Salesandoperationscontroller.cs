@@ -1,5 +1,7 @@
+using Mazaad.API.Filters;
 using Mazaad.Domain.Models;
 using Mazaad.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -9,6 +11,8 @@ namespace Mazaad.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
+    [CompanyOwnership]
     public class SalesStatisticsController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -65,7 +69,6 @@ namespace Mazaad.API.Controllers
 
             var fromDate = DateTime.UtcNow.AddMonths(-months);
 
-            // نجيب البيانات الخام الأول (بدون Math.Round في SQL عشان EF Core بيترجمها غلط أحياناً)
             var raw = await _context.Orders
                 .Where(o => o.SellerCompanyId == companyId && o.OrderDate >= fromDate)
                 .Select(o => new
@@ -77,7 +80,6 @@ namespace Mazaad.API.Controllers
                 })
                 .ToListAsync();
 
-            // GroupBy + الحسابات على الـ client بعد ما جبنا البيانات
             var result = raw
                 .GroupBy(o => new { o.Year, o.Month })
                 .Select(g => new
@@ -102,8 +104,6 @@ namespace Mazaad.API.Controllers
             if (top < 1 || top > 50)
                 return BadRequest(new { message = "top must be between 1 and 50." });
 
-            // نعمل Select أولاً بدل Include+GroupBy على navigation properties
-            // لأن EF Core مش بيترجم GroupBy على nested nav-props لـ SQL صح
             var raw = await _context.Orders
                 .Where(o => o.SellerCompanyId == companyId
                          && o.Bid != null
@@ -143,8 +143,6 @@ namespace Mazaad.API.Controllers
             if (top < 1 || top > 50)
                 return BadRequest(new { message = "top must be between 1 and 50." });
 
-            // نعمل Select أولاً بدل Include+GroupBy على navigation properties
-            // عشان EF Core بيترجم GroupBy على o.BuyerCompany.CompanyName لـ SQL غلط
             var raw = await _context.Orders
                 .Where(o => o.SellerCompanyId == companyId)
                 .Select(o => new
@@ -176,6 +174,8 @@ namespace Mazaad.API.Controllers
 
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
+    [CompanyOwnership]
     public class OperationsController : ControllerBase
     {
         private readonly AppDbContext _context;

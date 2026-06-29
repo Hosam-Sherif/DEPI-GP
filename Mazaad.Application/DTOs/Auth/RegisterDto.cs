@@ -21,7 +21,10 @@ namespace Mazaad.Application.DTOs.Auth
         [MaxLength(100)]
         public string JobTitle { get; set; } = string.Empty;
 
-        // إذا كان بيسجل كـ CompanyAdmin لشركة جديدة
-        public int? CompanyId { get; set; }
+        // ⚠️ CompanyId اتشال نهائيًا.
+        // الانضمام لشركة بيتم فقط عن طريق CompanyAdmin
+        // من CompanyUsersController.AddUser — مش عن طريق
+        // الـ user نفسه وقت التسجيل، عشان منمنعش أي حد
+        // يحط companyId جاهز في الـ request ويرتبط بشركة من غير إذن.
     }
 }

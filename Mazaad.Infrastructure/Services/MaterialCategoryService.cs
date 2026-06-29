@@ -27,7 +27,8 @@ namespace Mazaad.Infrastructure.Services
                 Id = c.Id,
                 CategoryName = c.CategoryName,
                 Description = c.Description,
-                UnitOfMeasure = c.UnitOfMeasure
+                UnitOfMeasure = c.UnitOfMeasure,
+                CreatedAt = c.CreatedAt
             });
         }
 
@@ -41,7 +42,8 @@ namespace Mazaad.Infrastructure.Services
                 Id = category.Id,
                 CategoryName = category.CategoryName,
                 Description = category.Description,
-                UnitOfMeasure = category.UnitOfMeasure
+                UnitOfMeasure = category.UnitOfMeasure,
+                CreatedAt = category.CreatedAt
             };
         }
 
@@ -63,7 +65,29 @@ namespace Mazaad.Infrastructure.Services
                 Id = category.Id,
                 CategoryName = category.CategoryName,
                 Description = category.Description,
-                UnitOfMeasure = category.UnitOfMeasure
+                UnitOfMeasure = category.UnitOfMeasure,
+                CreatedAt = category.CreatedAt
+            };
+        }
+
+        public async Task<CategoryResponseDto?> UpdateCategoryAsync(int id, CreateCategoryDto request)
+        {
+            var category = await _context.MaterialCategories.FindAsync(id);
+            if (category == null) return null;
+
+            category.CategoryName = request.CategoryName;
+            category.Description = request.Description;
+            category.UnitOfMeasure = request.UnitOfMeasure;
+
+            await _context.SaveChangesAsync();
+
+            return new CategoryResponseDto
+            {
+                Id = category.Id,
+                CategoryName = category.CategoryName,
+                Description = category.Description,
+                UnitOfMeasure = category.UnitOfMeasure,
+                CreatedAt = category.CreatedAt
             };
         }
 

@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Mazaad.API.Controllers
@@ -16,16 +17,21 @@ namespace Mazaad.API.Controllers
             _industryService = industryService;
         }
 
-        /// <summary>Get all active industry types (used for marketplace sector filter).</summary>
+        /// <summary>
+        /// Get all active industry types — PUBLIC.
+        /// Used for marketplace sector filter + company registration dropdown.
+        /// </summary>
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
             var industries = await _industryService.GetAllIndustriesAsync();
             return Ok(industries);
         }
 
-        /// <summary>Get a single industry type by ID.</summary>
+        /// <summary>Get a single industry type by ID — PUBLIC.</summary>
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetById(int id)
         {
             var industry = await _industryService.GetIndustryByIdAsync(id);
@@ -33,16 +39,28 @@ namespace Mazaad.API.Controllers
             return Ok(industry);
         }
 
-        /// <summary>Create a new industry type.</summary>
+        /// <summary>Create a new industry type — SuperAdmin only.</summary>
         [HttpPost]
+        [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> Create([FromBody] CreateIndustryDto request)
         {
             var created = await _industryService.CreateIndustryAsync(request);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
 
-        /// <summary>Soft-delete an industry type.</summary>
+        /// <summary>Update an industry type's name — SuperAdmin only.</summary>
+        [HttpPut("{id}")]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateIndustryDto request)
+        {
+            var updated = await _industryService.UpdateIndustryAsync(id, request);
+            if (updated == null) return NotFound();
+            return Ok(updated);
+        }
+
+        /// <summary>Soft-delete an industry type — SuperAdmin only.</summary>
         [HttpDelete("{id}")]
+        [Authorize(Roles = "SuperAdmin")]
         public async Task<IActionResult> Delete(int id)
         {
             var success = await _industryService.DeleteIndustryAsync(id);

@@ -4,7 +4,6 @@ using Mazaad.Domain.Enums;
 
 namespace Mazaad.Application.DTOs
 {
-    /// <summary>Full listing detail for the Live Bidding Room screen.</summary>
     public class ListingDetailDto
     {
         public int Id { get; set; }
@@ -30,7 +29,9 @@ namespace Mazaad.Application.DTOs
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
 
-        /// <summary>Top 5 bids ordered descending by amount, shown in Live Bidding Feed</summary>
+        /// <summary>Id of the winning (highest) bid. Null if no bids placed.</summary>
+        public int? WinningBidId { get; set; }
+
         public IEnumerable<BidDetailDto> TopBids { get; set; } = new List<BidDetailDto>();
     }
 }
