@@ -1,5 +1,5 @@
 // Mazaad.API/Program.cs
-
+using Mazaad.Infrastructure.Services.Payment;
 using Mazaad.API.Hubs;
 using Mazaad.Application.Common;
 using
@@ -226,6 +226,12 @@ Main(string[] args)
             builder.Services.AddHostedService<AuctionStatusUpdaterService>();
 
             builder.Services.AddScoped<IEmployeeService, EmployeeService>(); ;
+            //-----payment
+            builder.Services.AddScoped<IOrderService, OrderService>();
+
+            builder.Services.Configure<PaymobOptions>(builder.Configuration.GetSection("Paymob"));
+            builder.Services.AddHttpClient<PaymobClient>();
+            builder.Services.AddScoped<IPaymentService, PaymentService>();
             // في Program.cs أو ServiceCollectionExtensions — زود السطر ده مع باقي الـ services
             builder.Services.AddScoped<ICommissionPolicyService, CommissionPolicyService>();
 
