@@ -14,6 +14,9 @@ namespace Mazaad.Application.Interfaces.Services
         // ── تسجيل الدخول ────────────────────────────────
         Task<Result<AuthResponseDto>> LoginAsync(LoginDto dto, string ipAddress);
 
+        // ── تسجيل / تسجيل دخول عبر جوجل ─────────────────
+        Task<Result<GoogleAuthResponseDto>> GoogleLoginAsync(GoogleLoginDto dto, string ipAddress);
+
         // ── تجديد الـ Access Token باستخدام Refresh Token
         Task<Result<AuthResponseDto>> RefreshTokenAsync(string refreshToken, string ipAddress);
 

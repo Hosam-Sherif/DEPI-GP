@@ -157,14 +157,14 @@ namespace Mazaad.API
             // ─── CORS ─────────────────────────────────────────────────────────
             builder.Services.AddCors(options =>
             {
-                options.AddDefaultPolicy(policy =>
-                    policy.WithOrigins(
-                              builder.Configuration
-                                     .GetSection("AllowedOrigins")
-                                     .Get<string[]>() ?? new[] { "http://localhost:3000" })
-                          .AllowAnyHeader()
-                          .AllowAnyMethod()
-                          .AllowCredentials());
+                options.AddPolicy("MazaadCors", policy =>
+                    policy
+                        .WithOrigins(
+                            "http://localhost:4200",
+                            "https://localhost:4200")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod()
+                        .AllowCredentials());
             });
 
             // ─── SignalR ──────────────────────────────────────────────────────
@@ -241,7 +241,7 @@ namespace Mazaad.API
             });
 
             app.UseStaticFiles();
-            app.UseCors();
+            app.UseCors("MazaadCors");
             app.UseAuthentication();
             app.UseAuthorization();
 

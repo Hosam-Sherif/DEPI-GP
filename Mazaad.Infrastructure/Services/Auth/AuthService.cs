@@ -1,5 +1,6 @@
 ﻿// Mazaad.Infrastructure/Services/Auth/AuthService.cs
 
+using Google.Apis.Auth;
 using Mazaad.Application.Common;
 using Mazaad.Application.DTOs.Auth;
 using Mazaad.Application.Interfaces.Services;
@@ -141,6 +142,103 @@ namespace Mazaad.Infrastructure.Services.Auth
                 email: user.Email);
 
             return await BuildAuthResponseAsync(user, ipAddress, dto.RememberMe);
+        }
+
+        // ── Google Login / Register ──────────────────────────────────────────
+        public async Task<Result<GoogleAuthResponseDto>> GoogleLoginAsync(
+            GoogleLoginDto dto,
+            string ipAddress)
+        {
+            GoogleJsonWebSignature.Payload payload;
+            try
+            {
+                var settings = new GoogleJsonWebSignature.ValidationSettings
+                {
+                    Audience = new[] { _config["GoogleAuth:ClientId"] }
+                };
+
+                payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
+            }
+            catch (Exception)
+            {
+                await _securityLog.LogAsync(
+                    SecurityEventType.LoginFailed,
+                    success: false,
+                    ipAddress: ipAddress,
+                    details: "Invalid Google ID token");
+
+                return Result<GoogleAuthResponseDto>.Failure("Invalid Google token.");
+            }
+
+            var wantsCompanyAccount = string.Equals(
+                dto.AccountType, "Company", StringComparison.OrdinalIgnoreCase);
+
+            var user = await _userManager.FindByEmailAsync(payload.Email);
+            var isNewUser = false;
+
+            if (user == null)
+            {
+                user = new ApplicationUser
+                {
+                    FullName = payload.Name ?? payload.Email,
+                    Email = payload.Email,
+                    UserName = payload.Email,
+                    EmailConfirmed = true,
+                    IsActive = true,
+                    ProfilePictureUrl = payload.Picture,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                var createResult = await _userManager.CreateAsync(user);
+                if (!createResult.Succeeded)
+                    return Result<GoogleAuthResponseDto>.Failure(
+                        createResult.Errors.Select(e => e.Description));
+
+                await _userManager.AddToRoleAsync(
+                    user, wantsCompanyAccount ? "CompanyAdmin" : "Bidder");
+
+                isNewUser = true;
+            }
+
+            if (!user.IsActive)
+                return Result<GoogleAuthResponseDto>.Failure("Account is inactive.");
+
+            // نربط حساب جوجل بالمستخدم لو لسه مش مربوط (يفيد لو كان مسجل قبل كده بباسورد عادي)
+            var logins = await _userManager.GetLoginsAsync(user);
+            if (!logins.Any(l => l.LoginProvider == "Google" && l.ProviderKey == payload.Subject))
+            {
+                await _userManager.AddLoginAsync(
+                    user, new UserLoginInfo("Google", payload.Subject, "Google"));
+            }
+
+            user.LastLoginDate = DateTime.UtcNow;
+            await _userManager.UpdateAsync(user);
+
+            await _securityLog.LogAsync(
+                isNewUser ? SecurityEventType.AccountRegistered : SecurityEventType.LoginSuccess,
+                success: true,
+                ipAddress: ipAddress,
+                userId: user.Id,
+                email: user.Email,
+                details: "Google sign-in");
+
+            var authResult = await BuildAuthResponseAsync(user, ipAddress);
+            if (!authResult.Succeeded)
+                return Result<GoogleAuthResponseDto>.Failure(authResult.Errors);
+
+            var roles = authResult.Data!.User.Roles;
+            var requiresCompanyCompletion =
+                roles.Contains("CompanyAdmin") && user.CompanyId == null;
+
+            return Result<GoogleAuthResponseDto>.Success(new GoogleAuthResponseDto
+            {
+                AccessToken = authResult.Data.AccessToken,
+                RefreshToken = authResult.Data.RefreshToken,
+                AccessTokenExpiry = authResult.Data.AccessTokenExpiry,
+                User = authResult.Data.User,
+                RequiresCompanyProfileCompletion = requiresCompanyCompletion
+            });
         }
 
         // ── Refresh Token ─────────────────────────────────────────────────────

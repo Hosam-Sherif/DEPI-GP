@@ -68,6 +68,31 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>
+        /// تسجيل الدخول / إنشاء حساب عبر جوجل.
+        /// الفرونت بيبعت الـ ID Token اللي راجع من Google Identity Services
+        /// + accountType ("Bidder" أو "Company") في حالة المستخدم جديد.
+        /// </summary>
+        [HttpPost("google-login")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GoogleLogin([FromBody] GoogleLoginDto dto)
+        {
+            var result = await _authService.GoogleLoginAsync(dto, GetIpAddress());
+
+            if (!result.Succeeded)
+                return BadRequest(new { errors = result.Errors });
+
+            SetRefreshTokenCookie(result.Data!.RefreshToken);
+
+            return Ok(new
+            {
+                accessToken = result.Data.AccessToken,
+                accessTokenExpiry = result.Data.AccessTokenExpiry,
+                user = result.Data.User,
+                requiresCompanyProfileCompletion = result.Data.RequiresCompanyProfileCompletion
+            });
+        }
+
+        /// <summary>
         /// تجديد الـ Access Token باستخدام الـ Refresh Token من الـ Cookie.
         /// </summary>
         [HttpPost("refresh-token")]
