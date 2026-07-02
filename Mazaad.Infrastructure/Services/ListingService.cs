@@ -58,6 +58,8 @@ namespace Mazaad.Infrastructure.Services
                 .Include(l => l.Company)
                 .Include(l => l.Bids.OrderByDescending(b => b.BidAmountPerUnit).Take(5))
                     .ThenInclude(b => b.BuyerCompany)
+                .Include(l => l.Bids)
+                    .ThenInclude(b => b.User)   // 🔴 تعديل: Include جديد لجلب اسم البيدر الفردي
                 .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
 
             if (listing == null) return null;
@@ -95,7 +97,9 @@ namespace Mazaad.Infrastructure.Services
                     Id = b.Id,
                     ListingId = b.ListingId,
                     BuyerCompanyId = b.BuyerCompanyId,
-                    DisplayBidderName = b.IsAnonymous ? "Anonymous" : b.BuyerCompany.CompanyName,
+                    DisplayBidderName = b.IsAnonymous
+                        ? "Anonymous"
+                        : (b.BuyerCompany?.CompanyName ?? b.User?.FullName ?? "Unknown"),   // 🔴 تعديل: كانت b.BuyerCompany.CompanyName بس (تكسر لو بيدر فردي)
                     BidAmountPerUnit = b.BidAmountPerUnit,
                     TotalBidAmount = b.TotalBidAmount,
                     Quantity = b.Quantity,

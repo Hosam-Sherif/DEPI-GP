@@ -210,6 +210,7 @@ namespace Mazaad.API.Controllers
             var recentBids = await _context.Bids
                 .Include(b => b.Listing)
                 .Include(b => b.BuyerCompany)
+                .Include(b => b.User)   // 🔴 تعديل: Include جديد
                 .Where(b => b.Listing.CompanyId == companyId)
                 .OrderByDescending(b => b.CreatedAt)
                 .Take(5)
@@ -217,7 +218,7 @@ namespace Mazaad.API.Controllers
                 {
                     b.Id,
                     ListingTitle = b.Listing.Title,
-                    BidderName = b.IsAnonymous ? "Anonymous" : b.BuyerCompany.CompanyName,
+                    BidderName = b.IsAnonymous ? "Anonymous" : (b.BuyerCompany != null ? b.BuyerCompany.CompanyName : b.User.FullName),   // 🔴 تعديل: كانت b.BuyerCompany.CompanyName بس
                     b.BidAmountPerUnit,
                     b.CreatedAt
                 })
@@ -295,6 +296,7 @@ namespace Mazaad.API.Controllers
             var bids = await _context.Bids
                 .Include(b => b.Listing)
                 .Include(b => b.BuyerCompany)
+                .Include(b => b.User)   // 🔴 تعديل: Include جديد
                 .Where(b => b.Listing.CompanyId == companyId)
                 .OrderByDescending(b => b.CreatedAt)
                 .Skip((page - 1) * pageSize)
@@ -303,7 +305,7 @@ namespace Mazaad.API.Controllers
                 {
                     Type = "Bid",
                     Description = $"Bid on {b.Listing.Title}",
-                    Actor = b.IsAnonymous ? "Anonymous" : b.BuyerCompany.CompanyName,
+                    Actor = b.IsAnonymous ? "Anonymous" : (b.BuyerCompany != null ? b.BuyerCompany.CompanyName : b.User.FullName),   // 🔴 تعديل
                     Amount = b.BidAmountPerUnit,
                     Timestamp = b.CreatedAt
                 })

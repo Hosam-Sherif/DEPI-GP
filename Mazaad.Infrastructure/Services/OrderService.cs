@@ -68,6 +68,11 @@ namespace Mazaad.Infrastructure.Services
             if (bid.Listing.EndDate > DateTime.UtcNow)
                 throw new InvalidOperationException("Auction has not ended yet.");
 
+            // 🔴 تعديل: شرط جديد بالكامل — الحماية دي ضرورية عشان Order.BuyerCompanyId لسه إجباري
+            if (bid.BuyerCompanyId == null)
+                throw new InvalidOperationException(
+                    "This bid was placed by an individual bidder. Order/payment fulfillment for individual buyers is not supported yet.");
+
             // Find the applicable commission policy
             var policy = await _context.CommissionPolicies
                 .Where(p => p.Active && p.EffectiveFrom <= DateTime.UtcNow && p.EffectiveTo >= DateTime.UtcNow)
@@ -87,7 +92,7 @@ namespace Mazaad.Infrastructure.Services
             var order = new Orders
             {
                 SellerCompanyId = sellerCompanyId,
-                BuyerCompanyId = bid.BuyerCompanyId,
+                BuyerCompanyId = bid.BuyerCompanyId.Value,   // 🔴 تعديل: كانت bid.BuyerCompanyId مباشرة (بقت int? فمحتاجة .Value بعد التأكد إنها مش null)
                 BidId = bid.Id,
                 AppliedPolicyId = policy.Id,
                 AgreedQuantity = bid.Quantity,

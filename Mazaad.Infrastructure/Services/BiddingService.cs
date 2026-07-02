@@ -31,7 +31,7 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Place Full Bid ───────────────────────────────────────────────────────
 
-        public async Task<BidResultDto> PlaceBidAsync(int userId, int companyId, PlaceBidDto request)
+        public async Task<BidResultDto> PlaceBidAsync(int userId, int? companyId, PlaceBidDto request)   // 🔴 تعديل: companyId بقى int?
         {
             if (request.BidAmountPerUnit <= 0)
                 return Fail("Bid amount must be greater than zero.");
@@ -91,8 +91,21 @@ namespace Mazaad.Infrastructure.Services
             {
                 await _context.SaveChangesAsync();
 
-                var company = await _context.Companies.FindAsync(companyId);
-                var displayName = request.IsAnonymous ? "Anonymous" : (company?.CompanyName ?? "Unknown");
+                string displayName;
+                if (request.IsAnonymous)
+                {
+                    displayName = "Anonymous";
+                }
+                else if (companyId.HasValue)
+                {
+                    var company = await _context.Companies.FindAsync(companyId.Value);
+                    displayName = company?.CompanyName ?? "Unknown";
+                }
+                else
+                {
+                    var user = await _context.Users.FindAsync(userId);
+                    displayName = user?.FullName ?? "Unknown";
+                }
 
                 foreach (var prev in previousActiveBids)
                 {
@@ -122,7 +135,7 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Quick Bid ────────────────────────────────────────────────────────────
 
-        public async Task<BidResultDto> PlaceQuickBidAsync(int userId, int companyId, QuickBidDto request)
+        public async Task<BidResultDto> PlaceQuickBidAsync(int userId, int? companyId, QuickBidDto request)   // 🔴 تعديل: companyId بقى int?
         {
             if (request.BidAmountPerUnit <= 0)
                 return Fail("Bid amount must be greater than zero.");
@@ -155,6 +168,7 @@ namespace Mazaad.Infrastructure.Services
         {
             var bids = await _context.Bids
                 .Include(b => b.BuyerCompany)
+                .Include(b => b.User)   
                 .Where(b => b.ListingId == listingId)
                 .OrderByDescending(b => b.BidAmountPerUnit)
                 .ToListAsync();
@@ -163,7 +177,7 @@ namespace Mazaad.Infrastructure.Services
             {
                 Success = true,
                 Message = "Bid retrieved",
-                DisplayBiddersName = b.IsAnonymous ? "Anonymous" : b.BuyerCompany.CompanyName,
+                DisplayBiddersName = ResolveDisplayName(b),  
                 NewPrice = b.BidAmountPerUnit
             });
         }
@@ -174,6 +188,7 @@ namespace Mazaad.Infrastructure.Services
         {
             var bids = await _context.Bids
                 .Include(b => b.BuyerCompany)
+                .Include(b => b.User)   
                 .Where(b => b.ListingId == listingId && b.Status != BidStatus.Cancelled)
                 .OrderByDescending(b => b.BidAmountPerUnit)
                 .Take(10)
@@ -188,6 +203,7 @@ namespace Mazaad.Infrastructure.Services
         {
             var bid = await _context.Bids
                 .Include(b => b.BuyerCompany)
+                .Include(b => b.User)   
                 .FirstOrDefaultAsync(b => b.Id == bidId);
 
             return bid == null ? null : MapToBidDetailDto(bid);
@@ -199,40 +215,56 @@ namespace Mazaad.Infrastructure.Services
         {
             var bids = await _context.Bids
                 .Include(b => b.BuyerCompany)
+                .Include(b => b.User)   
                 .Include(b => b.Listing)
                 .Where(b => b.BuyerCompanyId == companyId)
                 .OrderByDescending(b => b.CreatedAt)
                 .ToListAsync();
 
-            return bids.Select(b =>
+            return bids.Select(ApplyOutcomeStatus); 
+        }
+
+        // ─── My Bids (by user — works for both company users and individual bidders) ── 
+
+        public async Task<IEnumerable<BidDetailDto>> GetBidsByUserAsync(int userId)
+        {
+            var bids = await _context.Bids
+                .Include(b => b.BuyerCompany)
+                .Include(b => b.User)
+                .Include(b => b.Listing)
+                .Where(b => b.PlacedByUserId == userId)
+                .OrderByDescending(b => b.CreatedAt)
+                .ToListAsync();
+
+            return bids.Select(ApplyOutcomeStatus);
+        }
+
+        private static BidDetailDto ApplyOutcomeStatus(Bids b)
+        {
+            var dto = MapToBidDetailDto(b);
+
+            var isHighestBid = b.Listing != null &&
+                               b.Listing.CurrentHighestBid == b.BidAmountPerUnit;
+
+            if (isHighestBid && b.Listing!.Status == ListingStatus.Ended)
             {
-                var dto = MapToBidDetailDto(b);
+                dto.Status = BidStatus.Won;
+            }
+            else if (isHighestBid && b.Listing!.Status == ListingStatus.Active)
+            {
+                dto.Status = BidStatus.Winning;
+            }
 
-                var isHighestBid = b.Listing != null &&
-                                   b.Listing.CurrentHighestBid == b.BidAmountPerUnit;
-
-                // فاز: المزاد خلص (Status = Ended) وهو الأعلى
-                if (isHighestBid && b.Listing!.Status == ListingStatus.Ended)
-                {
-                    dto.Status = BidStatus.Won;
-                }
-                // في الصدارة: المزاد لسه شغال وهو الأعلى
-                else if (isHighestBid && b.Listing!.Status == ListingStatus.Active)
-                {
-                    dto.Status = BidStatus.Winning;
-                }
-
-                return dto;
-            });
+            return dto;
         }
 
         // ─── Delete / Cancel Bid ──────────────────────────────────────────────────
 
-        public async Task<bool> DeleteBidAsync(int bidId, int companyId)
+        public async Task<bool> DeleteBidAsync(int bidId, int userId) 
         {
             var bid = await _context.Bids.FindAsync(bidId);
 
-            if (bid == null || bid.BuyerCompanyId != companyId)
+            if (bid == null || bid.PlacedByUserId != userId)
                 return false;
 
             if (bid.Status == BidStatus.Cancelled)
@@ -293,7 +325,7 @@ namespace Mazaad.Infrastructure.Services
             Id = b.Id,
             ListingId = b.ListingId,
             BuyerCompanyId = b.BuyerCompanyId,
-            DisplayBidderName = b.IsAnonymous ? "Anonymous" : b.BuyerCompany.CompanyName,
+            DisplayBidderName = ResolveDisplayName(b),   
             BidAmountPerUnit = b.BidAmountPerUnit,
             TotalBidAmount = b.TotalBidAmount,
             Quantity = b.Quantity,
@@ -301,5 +333,17 @@ namespace Mazaad.Infrastructure.Services
             Status = b.Status,
             CreatedAt = b.CreatedAt
         };
+
+        /// <summary>Resolves the name shown for a bid: 'Anonymous', the company name, or the individual bidder's full name.</summary>
+        private static string ResolveDisplayName(Bids b)
+        {
+            if (b.IsAnonymous)
+                return "Anonymous";
+
+            if (b.BuyerCompany != null)
+                return b.BuyerCompany.CompanyName;
+
+            return b.User?.FullName ?? "Unknown";
+        }
     }
 }

@@ -68,6 +68,13 @@ namespace Mazaad.Infrastructure.Persistence
                  .OnDelete(DeleteBehavior.NoAction);
             });
 
+            // ── Bids ──────────────────────────────────────────────────────────
+            modelBuilder.Entity<Bids>()
+                .HasOne(b => b.BuyerCompany)
+                .WithMany(c => c.Bids)
+                .HasForeignKey(b => b.BuyerCompanyId)
+                .OnDelete(DeleteBehavior.NoAction)
+                .IsRequired(false);   
             // ── RefreshToken ──────────────────────────────────────────────────
             modelBuilder.Entity<RefreshToken>(b =>
             {
@@ -182,6 +189,7 @@ namespace Mazaad.Infrastructure.Persistence
 
         private static void SeedRoles(ModelBuilder modelBuilder)
         {
+
             modelBuilder.Entity<ApplicationRole>().HasData(
                 new ApplicationRole
                 {
@@ -191,6 +199,7 @@ namespace Mazaad.Infrastructure.Persistence
                     Description = "Platform-level administrator",
                     CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                 },
+
                 new ApplicationRole
                 {
                     Id = 2,
@@ -207,6 +216,7 @@ namespace Mazaad.Infrastructure.Persistence
                     Description = "Standard bidder / operator",
                     CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                 }
+
             );
         }
 

@@ -3,14 +3,14 @@ using Mazaad.Domain.Enums;
 
 namespace Mazaad.Application.DTOs
 {
-    /// <summary>Individual bid detail record shown in the Live Bidding Feed.</summary>
     public class BidDetailDto
     {
         public int Id { get; set; }
         public int ListingId { get; set; }
-        public int BuyerCompanyId { get; set; }
 
-        /// <summary>Displayed bidder name: 'Anonymous' or company name</summary>
+        /// <summary>Null when the bid was placed by an individual (non-company) bidder.</summary>
+        public int? BuyerCompanyId { get; set; }  
+
         public string DisplayBidderName { get; set; } = string.Empty;
         public decimal BidAmountPerUnit { get; set; }
         public decimal TotalBidAmount { get; set; }

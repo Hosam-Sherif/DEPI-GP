@@ -234,16 +234,15 @@ namespace Mazaad.Infrastructure.Hubs
                     return;
                 }
 
-                if (!int.TryParse(companyIdClaim, out int companyId) || companyId <= 0)
-                {
-                    await Clients.Caller.SendAsync("BidRejected", new { message = "Only verified company members can place bids." });
-                    return;
-                }
+                // companyId is optional: individual (non-company) bidders place bids under their own name.
+                int? companyId = int.TryParse(companyIdClaim, out int parsedCompanyId) && parsedCompanyId > 0   // 🔴 تعديل: كانت int.TryParse بترفض لو مفيش companyId
+                    ? parsedCompanyId
+                    : null;
 
                 var result =
                     await _biddingService.PlaceBidAsync(
                         userId,
-                        companyId,
+                        companyId,   // 🔴 تعديل: كانت بتبعت companyId إجباري وترفض قبلها لو مش موجود
                         request);
 
                 if (!result.Success)
