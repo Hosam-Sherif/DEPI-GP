@@ -161,7 +161,8 @@ namespace Mazaad.API
                     policy
                         .WithOrigins(
                             "http://localhost:4200",
-                            "https://localhost:4200")
+                            "https://localhost:4200",
+                            "https://mazzad-front-end.vercel.app")
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .AllowCredentials());
