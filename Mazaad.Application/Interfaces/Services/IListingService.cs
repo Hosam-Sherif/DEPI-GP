@@ -30,5 +30,13 @@ namespace Mazaad.Application.Interfaces.Services
 
         /// <summary>Cancel a listing (sets status to Cancelled without deleting)</summary>
         Task<bool> CancelListingAsync(int id, int companyId);
+
+        /// <summary>
+        /// Ends an Active/Upcoming auction immediately (sets status to Ended, EndDate = now)
+        /// and returns the outcome, including the winning bid if one exists.
+        /// Returns null if the listing doesn't exist, isn't owned by the company,
+        /// or is already Ended/Cancelled.
+        /// </summary>
+        Task<EndAuctionResultDto?> EndListingNowAsync(int id, int companyId);
     }
 }

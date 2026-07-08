@@ -107,6 +107,25 @@ namespace Mazaad.API.Controllers
             return NoContent();
         }
 
+        /// <summary>
+        /// End an auction immediately — sets status to Ended and EndDate to now,
+        /// and returns the winning bid (if any) so the caller can announce it.
+        /// Only members of the owning company can end it. Cannot end an already
+        /// Ended or Cancelled auction.
+        /// </summary>
+        [HttpPatch("{id}/end")]
+        [Authorize]
+        public async Task<IActionResult> EndNow(int id)
+        {
+            var companyId = GetCurrentCompanyId();
+            if (companyId == null)
+                return Unauthorized(new { error = "A valid company account is required to end auctions." });
+
+            var result = await _listingService.EndListingNowAsync(id, companyId.Value);
+            if (result == null) return BadRequest(new { error = "Could not end auction. It may not exist, already be ended/cancelled, or you don't own it." });
+            return Ok(result);
+        }
+
         /// <summary>Soft-delete a listing. Only members of the owning company can delete.</summary>
         [HttpDelete("{id}")]
         [Authorize]

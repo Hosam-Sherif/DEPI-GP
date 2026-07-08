@@ -13,10 +13,12 @@ namespace Mazaad.API.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
+        private readonly IWebHostEnvironment _env;
 
-        public AuthController(IAuthService authService)
+        public AuthController(IAuthService authService, IWebHostEnvironment env)
         {
             _authService = authService;
+            _env = env;
         }
 
         /// <summary>
@@ -192,7 +194,10 @@ namespace Mazaad.API.Controllers
             Response.Cookies.Append("refreshToken", token, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = true,
+                // Secure=true بيمنع المتصفح يخزن/يرجع الكوكي إلا على HTTPS.
+                // لو سايبينها true دايمًا هتتكسر تلقائيًا على http://localhost في التطوير
+                // (الكوكي أصلاً مش هيتبعت مع طلب الـ refresh-token → 401 → logout إجباري).
+                Secure = !_env.IsDevelopment(),
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTime.UtcNow.AddDays(30)
             });

@@ -6,8 +6,10 @@ using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Enums;
 using Mazaad.Domain.Models;
+using Mazaad.Infrastructure.Hubs;
 using Mazaad.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mazaad.Infrastructure.Services
@@ -16,11 +18,13 @@ namespace Mazaad.Infrastructure.Services
     {
         private readonly AppDbContext _context;
         private readonly IImageService _imageService;
+        private readonly IHubContext<AuctionHub> _hubContext;
 
-        public ListingService(AppDbContext context, IImageService imageService)
+        public ListingService(AppDbContext context, IImageService imageService, IHubContext<AuctionHub> hubContext)
         {
             _context = context;
             _imageService = imageService;
+            _hubContext = hubContext;
         }
 
         // ─── Marketplace Grid ──────────────────────────────────────────────────────
@@ -59,7 +63,7 @@ namespace Mazaad.Infrastructure.Services
                 .Include(l => l.Bids.OrderByDescending(b => b.BidAmountPerUnit).Take(5))
                     .ThenInclude(b => b.BuyerCompany)
                 .Include(l => l.Bids)
-                    .ThenInclude(b => b.User)   // 🔴 تعديل: Include جديد لجلب اسم البيدر الفردي
+                    .ThenInclude(b => b.User)
                 .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
 
             if (listing == null) return null;
@@ -86,8 +90,8 @@ namespace Mazaad.Infrastructure.Services
                 ImageUrl = listing.ImageUrl,
                 Location = listing.Location,
                 DueDiligenceUrls = listing.DueDiligenceUrls,
-                StartDate = listing.StartDate,
-                EndDate = listing.EndDate,
+                StartDate = DateTime.SpecifyKind(listing.StartDate, DateTimeKind.Utc), // ← Fix
+                EndDate = DateTime.SpecifyKind(listing.EndDate, DateTimeKind.Utc), // ← Fix
                 WinningBidId = listing.Bids
                     .OrderByDescending(b => b.BidAmountPerUnit)
                     .Select(b => (int?)b.Id)
@@ -99,7 +103,7 @@ namespace Mazaad.Infrastructure.Services
                     BuyerCompanyId = b.BuyerCompanyId,
                     DisplayBidderName = b.IsAnonymous
                         ? "Anonymous"
-                        : (b.BuyerCompany?.CompanyName ?? b.User?.FullName ?? "Unknown"),   // 🔴 تعديل: كانت b.BuyerCompany.CompanyName بس (تكسر لو بيدر فردي)
+                        : (b.BuyerCompany?.CompanyName ?? b.User?.FullName ?? "Unknown"),
                     BidAmountPerUnit = b.BidAmountPerUnit,
                     TotalBidAmount = b.TotalBidAmount,
                     Quantity = b.Quantity,
@@ -128,11 +132,11 @@ namespace Mazaad.Infrastructure.Services
                 UnitOfMeasure = unitOfMeasure,
                 PurityPercentage = request.PurityPercentage,
                 BaseCurrency = request.BaseCurrency,
-                StartDate = request.StartDate,
-                EndDate = request.EndDate,
+                StartDate = EnsureUtc(request.StartDate),
+                EndDate = EnsureUtc(request.EndDate),
                 CurrentHighestBid = request.StartingPrice,
                 ImageUrl = "",
-                Status = request.StartDate > DateTime.UtcNow ? ListingStatus.Upcoming : ListingStatus.Active,
+                Status = EnsureUtc(request.StartDate) > DateTime.UtcNow ? ListingStatus.Upcoming : ListingStatus.Active,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsDeleted = false
@@ -164,8 +168,8 @@ namespace Mazaad.Infrastructure.Services
             listing.UnitOfMeasure = unitOfMeasure;
             listing.PurityPercentage = request.PurityPercentage;
             listing.BaseCurrency = request.BaseCurrency;
-            listing.StartDate = request.StartDate;
-            listing.EndDate = request.EndDate;
+            listing.StartDate = EnsureUtc(request.StartDate);
+            listing.EndDate = EnsureUtc(request.EndDate);
             listing.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -229,7 +233,6 @@ namespace Mazaad.Infrastructure.Services
             listing.Status = ListingStatus.Cancelled;
             listing.UpdatedAt = DateTime.UtcNow;
 
-            // إلغاء كل الـ bids المرتبطة بالـ listing
             var bids = await _context.Bids
                 .Where(b => b.ListingId == id && b.Status != BidStatus.Cancelled)
                 .ToListAsync();
@@ -241,7 +244,79 @@ namespace Mazaad.Infrastructure.Services
             return true;
         }
 
+        // ─── End Auction Now ──────────────────────────────────────────────────────
+
+        public async Task<EndAuctionResultDto?> EndListingNowAsync(int id, int companyId)
+        {
+            var listing = await _context.Listings
+                .Include(l => l.Bids)
+                    .ThenInclude(b => b.BuyerCompany)
+                .Include(l => l.Bids)
+                    .ThenInclude(b => b.User)
+                .FirstOrDefaultAsync(l => l.Id == id);
+
+            if (listing == null || listing.IsDeleted || listing.CompanyId != companyId)
+                return null;
+
+            if (listing.Status == ListingStatus.Ended || listing.Status == ListingStatus.Cancelled)
+                return null;
+
+            var now = DateTime.UtcNow;
+            listing.Status = ListingStatus.Ended;
+            listing.EndDate = now;
+            listing.UpdatedAt = now;
+
+            var winningBid = listing.Bids
+                .Where(b => b.Status != BidStatus.Cancelled)
+                .OrderByDescending(b => b.BidAmountPerUnit)
+                .FirstOrDefault();
+
+            var result = new EndAuctionResultDto
+            {
+                ListingId = listing.Id,
+                Title = listing.Title,
+                Status = listing.Status,
+                EndDate = listing.EndDate,
+                HasWinner = winningBid != null
+            };
+
+            if (winningBid != null)
+            {
+                result.WinningBidId = winningBid.Id;
+                result.WinnerDisplayName = winningBid.IsAnonymous
+                    ? "Anonymous"
+                    : (winningBid.BuyerCompany?.CompanyName ?? winningBid.User?.FullName ?? "Unknown");
+                result.WinningBidAmountPerUnit = winningBid.BidAmountPerUnit;
+                result.WinningTotalAmount = winningBid.TotalBidAmount;
+                result.WinningQuantity = winningBid.Quantity;
+            }
+
+            await _context.SaveChangesAsync();
+
+            var payload = new
+            {
+                listingId = result.ListingId,
+                title = result.Title,
+                endDate = result.EndDate,
+                hasWinner = result.HasWinner,
+                winnerDisplayName = result.WinnerDisplayName,
+                winningBidAmountPerUnit = result.WinningBidAmountPerUnit
+            };
+
+            await _hubContext.Clients.Group($"auction-{id}").SendAsync("AuctionEnded", payload);
+            await _hubContext.Clients.Group($"listing-{id}").SendAsync("AuctionEnded", payload);
+
+            return result;
+        }
+
         // ─── Private Helpers ──────────────────────────────────────────────────────
+
+        private static DateTime EnsureUtc(DateTime dt) => dt.Kind switch
+        {
+            DateTimeKind.Utc => dt,
+            DateTimeKind.Local => dt.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc)
+        };
 
         private IQueryable<Listings> BuildFilteredQuery(ListingFilterDto filter, int? companyId = null)
         {
@@ -319,6 +394,7 @@ namespace Mazaad.Infrastructure.Services
             };
         }
 
+        // ── Fix: SpecifyKind على StartDate و EndDate + إضافة StartingPrice ────────
         private static ListingResponseDto MapToResponseDto(Listings listing) => new ListingResponseDto
         {
             Id = listing.Id,
@@ -331,8 +407,9 @@ namespace Mazaad.Infrastructure.Services
             UnitOfMeasure = listing.UnitOfMeasure,
             PurityPercentage = listing.PurityPercentage,
             BaseCurrency = listing.BaseCurrency,
-            StartDate = listing.StartDate,
-            EndDate = listing.EndDate,
+            StartDate = DateTime.SpecifyKind(listing.StartDate, DateTimeKind.Utc), // ← Fix UTC
+            EndDate = DateTime.SpecifyKind(listing.EndDate, DateTimeKind.Utc), // ← Fix UTC
+            StartingPrice = listing.CurrentHighestBid,                                 // ← مضاف
             CurrentHighestBid = listing.CurrentHighestBid,
             ImageUrl = listing.ImageUrl
         };

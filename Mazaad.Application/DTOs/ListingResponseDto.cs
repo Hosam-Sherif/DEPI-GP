@@ -16,7 +16,8 @@ namespace Mazaad.Application.DTOs
         public string BaseCurrency { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
+        public decimal StartingPrice { get; set; }  // ← مضاف
         public decimal CurrentHighestBid { get; set; }
-        public string ImageUrl { get; set; } = string.Empty;  // ← ده اللي كان ناقص
+        public string ImageUrl { get; set; } = string.Empty;
     }
 }
