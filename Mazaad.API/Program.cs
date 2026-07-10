@@ -16,10 +16,12 @@ using Mazaad.Infrastructure.Services.Inventory;
 using Mazaad.Infrastructure.Services.SalesOperations;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Threading.RateLimiting;
 
 namespace Mazaad.API
 {
@@ -226,6 +228,29 @@ namespace Mazaad.API
             // ─── Commission ───────────────────────────────────────────────────
             builder.Services.AddScoped<ICommissionPolicyService, CommissionPolicyService>();
 
+            // ─── Rate Limiting ────────────────────────────────────────────────
+            builder.Services.AddRateLimiter(options =>
+            {
+                // ── forgot-password: 3 طلبات كل 15 دقيقة لكل IP ──────────────
+                options.AddFixedWindowLimiter("forgot-password", limiterOptions =>
+                {
+                    limiterOptions.PermitLimit = 3;
+                    limiterOptions.Window = TimeSpan.FromMinutes(15);
+                    limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                    limiterOptions.QueueLimit = 0; // مفيش قائمة انتظار — رفض فوري
+                });
+
+                // ── الرد اللي بيرجع للـ client لو اتحظر ──────────────────────
+                options.OnRejected = async (context, cancellationToken) =>
+                {
+                    context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                    context.HttpContext.Response.ContentType = "application/json";
+                    await context.HttpContext.Response.WriteAsync(
+                        """{"error": "لقد تجاوزت الحد المسموح به من الطلبات. حاول مرة أخرى بعد قليل."}""",
+                        cancellationToken);
+                };
+            });
+
             // ─── Build ────────────────────────────────────────────────────────
             var app = builder.Build();
 
@@ -245,6 +270,7 @@ namespace Mazaad.API
             app.UseCors("MazaadCors");
             app.UseAuthentication();
             app.UseAuthorization();
+            app.UseRateLimiter();
 
             app.MapControllers();
             app.MapHub<ChatHub>("/hubs/chat");

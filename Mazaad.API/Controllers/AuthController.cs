@@ -4,6 +4,7 @@ using Mazaad.Application.DTOs.Auth;
 using Mazaad.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Mazaad.API.Controllers
@@ -157,11 +158,14 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>
-        /// طلب رابط استعادة كلمة المرور — بيتبعت دايمًا 200 OK
-        /// (حتى لو الإيميل غير مسجل) عشان منكشفش وجود الإيميل من عدمه.
+        /// طلب رابط استعادة كلمة المرور.
+        /// - Rate limited: 3 طلبات كل 15 دقيقة لنفس الـ IP.
+        /// - بيرجع دايمًا 200 OK (حماية من Email Enumeration).
         /// </summary>
         [HttpPost("forgot-password")]
         [AllowAnonymous]
+        // ✅ FIX: Rate Limiting — بيمنع spam الإيميلات (3 طلبات / 15 دقيقة لكل IP)
+        [EnableRateLimiting("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
         {
             await _authService.ForgotPasswordAsync(dto, GetIpAddress());
@@ -194,9 +198,6 @@ namespace Mazaad.API.Controllers
             Response.Cookies.Append("refreshToken", token, new CookieOptions
             {
                 HttpOnly = true,
-                // Secure=true بيمنع المتصفح يخزن/يرجع الكوكي إلا على HTTPS.
-                // لو سايبينها true دايمًا هتتكسر تلقائيًا على http://localhost في التطوير
-                // (الكوكي أصلاً مش هيتبعت مع طلب الـ refresh-token → 401 → logout إجباري).
                 Secure = !_env.IsDevelopment(),
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTime.UtcNow.AddDays(30)

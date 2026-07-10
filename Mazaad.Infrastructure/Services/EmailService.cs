@@ -25,6 +25,10 @@ namespace Mazaad.Infrastructure.Services
         {
             try
             {
+                _logger.LogInformation(
+                    "جاري إرسال إيميل إلى {ToEmail} | Subject: {Subject} | SmtpHost: {Host}:{Port}",
+                    toEmail, subject, _settings.SmtpHost, _settings.SmtpPort);
+
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(_settings.SenderName, _settings.SenderEmail));
                 message.To.Add(MailboxAddress.Parse(toEmail));
@@ -37,16 +41,26 @@ namespace Mazaad.Infrastructure.Services
 
                 using var client = new SmtpClient();
 
-                await client.ConnectAsync(_settings.SmtpHost, 465, SecureSocketOptions.SslOnConnect);
+                // ✅ بنستخدم SmtpPort من الـ settings بدل الـ hardcoded 465
+                await client.ConnectAsync(
+                    _settings.SmtpHost,
+                    _settings.SmtpPort,
+                    SecureSocketOptions.SslOnConnect);
+
                 await client.AuthenticateAsync(_settings.SenderEmail, _settings.SenderPassword);
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
+
+                _logger.LogInformation("✅ تم إرسال الإيميل بنجاح إلى {ToEmail}", toEmail);
 
                 return Result.Success();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "فشل إرسال الإيميل إلى {ToEmail}", toEmail);
+                _logger.LogError(ex,
+                    "❌ فشل إرسال الإيميل إلى {ToEmail} | Error: {Message}",
+                    toEmail, ex.Message);
+
                 return Result.Failure(ex.Message);
             }
         }

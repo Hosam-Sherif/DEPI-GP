@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace Mazaad.Infrastructure.Services.Auth
 {
@@ -23,6 +24,7 @@ namespace Mazaad.Infrastructure.Services.Auth
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
         private readonly IConfiguration _config;
+        private readonly ILogger<AuthService> _logger;
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
@@ -31,7 +33,8 @@ namespace Mazaad.Infrastructure.Services.Auth
             ISecurityLogService securityLog,
             AppDbContext context,
             IEmailService emailService,
-            IConfiguration config)
+            IConfiguration config,
+            ILogger<AuthService> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
@@ -40,6 +43,7 @@ namespace Mazaad.Infrastructure.Services.Auth
             _context = context;
             _emailService = emailService;
             _config = config;
+            _logger = logger;
         }
 
         // ── Register (مزايد عادي / Bidder) ──────────────────────────────────
@@ -204,7 +208,6 @@ namespace Mazaad.Infrastructure.Services.Auth
             if (!user.IsActive)
                 return Result<GoogleAuthResponseDto>.Failure("Account is inactive.");
 
-            // نربط حساب جوجل بالمستخدم لو لسه مش مربوط (يفيد لو كان مسجل قبل كده بباسورد عادي)
             var logins = await _userManager.GetLoginsAsync(user);
             if (!logins.Any(l => l.LoginProvider == "Google" && l.ProviderKey == payload.Subject))
             {
@@ -353,36 +356,50 @@ namespace Mazaad.Infrastructure.Services.Auth
         }
 
         // ── Forgot Password ───────────────────────────────────────────────────
-        /// <summary>
-        /// بيرجع Success دايمًا (حتى لو الإيميل مش موجود) عشان منكشفش
-        /// إن إيميل معين مسجل في النظام أو لأ (Email Enumeration Protection).
-        /// </summary>
         public async Task<Result> ForgotPasswordAsync(
             ForgotPasswordDto dto,
             string ipAddress)
         {
             var user = await _userManager.FindByEmailAsync(dto.Email);
 
-            // مفيش user بهذا الإيميل — نرجع Success برضو من غير ما نبعت حاجة
+            // مفيش user بهذا الإيميل — نرجع Success بدون ما نبعت حاجة (Email Enumeration Protection)
             if (user == null || !user.IsActive)
+            {
+                _logger.LogWarning(
+                    "Forgot password request for unknown/inactive email: {Email}", dto.Email);
                 return Result.Success();
+            }
 
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
 
             var clientBaseUrl = _config["ClientApp:BaseUrl"] ?? "http://localhost:4200";
+
+            // ✅ Token فيه special chars (+, /, =) لازم يتعمله encode عشان ميتكسرش في الـ URL
             var encodedToken = Uri.EscapeDataString(token);
             var encodedEmail = Uri.EscapeDataString(user.Email!);
 
             var resetLink =
                 $"{clientBaseUrl}/reset-password?email={encodedEmail}&token={encodedToken}";
 
+            _logger.LogInformation(
+                "إرسال reset link للمستخدم {Email} | Link: {Link}", user.Email, resetLink);
+
             var htmlBody = BuildResetPasswordEmailBody(user.FullName, resetLink);
 
-            await _emailService.SendEmailAsync(
+            var emailResult = await _emailService.SendEmailAsync(
                 user.Email!,
                 "إعادة تعيين كلمة المرور — Mazzad",
                 htmlBody);
 
+            if (!emailResult.Succeeded)
+            {
+                _logger.LogError(
+                    "❌ فشل إرسال إيميل reset password للمستخدم {Email} | Errors: {Errors}",
+                    user.Email,
+                    string.Join(", ", emailResult.Errors));
+            }
+
+            // ✅ نرجع Success دايمًا للـ client (حماية من Email Enumeration)
             return Result.Success();
         }
 
@@ -395,8 +412,13 @@ namespace Mazaad.Infrastructure.Services.Auth
             if (user == null)
                 return Result.Failure("Invalid request.");
 
+            // ✅ FIX: الفرونت بيبعت الـ token من الـ URL query string
+            // المتصفح بيعمل decode تلقائي لـ query params في بعض الحالات وفي حالات تانية لأ
+            // عشان كده بنعمل decode صريح هنا عشان نضمن إن الـ token صح دايمًا
+            var decodedToken = Uri.UnescapeDataString(dto.Token);
+
             var result = await _userManager.ResetPasswordAsync(
-                user, dto.Token, dto.NewPassword);
+                user, decodedToken, dto.NewPassword);
 
             if (!result.Succeeded)
             {
@@ -411,7 +433,14 @@ namespace Mazaad.Infrastructure.Services.Auth
                 return Result.Failure(result.Errors.Select(e => e.Description));
             }
 
-            // نلغي كل الـ refresh tokens — أي جلسة قديمة لازم تعمل login تاني
+            // ✅ FIX: تأكيد الإيميل تلقائياً لو مش confirmed
+            // المستخدم أثبت إنه بيملك الإيميل ده من خلال الرابط اللي وصله
+            if (!user.EmailConfirmed)
+            {
+                user.EmailConfirmed = true;
+                await _userManager.UpdateAsync(user);
+            }
+
             await RevokeAllUserTokensAsync(user.Id, "Password reset via email link", ipAddress);
 
             await _securityLog.LogAsync(
@@ -511,6 +540,10 @@ namespace Mazaad.Infrastructure.Services.Auth
             var accessToken = await _jwtService.GenerateAccessTokenAsync(user, roles);
             var refreshToken = _jwtService.GenerateRefreshToken();
 
+            // ✅ FIX: AccessTokenExpiry بييجي من الـ config مش hardcoded
+            // عشان يكون متزامن مع الـ JWT expiry اللي بيولده JwtService فعلاً
+            var accessTokenMinutes = _config.GetValue<int>("JwtSettings:AccessTokenExpiryMinutes", 15);
+
             var refreshTokenEntity = new RefreshToken
             {
                 UserId = user.Id,
@@ -527,7 +560,7 @@ namespace Mazaad.Infrastructure.Services.Auth
             {
                 AccessToken = accessToken,
                 RefreshToken = refreshToken,
-                AccessTokenExpiry = DateTime.UtcNow.AddMinutes(15),
+                AccessTokenExpiry = DateTime.UtcNow.AddMinutes(accessTokenMinutes),
                 User = new UserInfoDto
                 {
                     Id = user.Id,
