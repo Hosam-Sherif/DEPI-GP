@@ -45,7 +45,7 @@ namespace Mazaad.Infrastructure.Services
                 await client.ConnectAsync(
                     _settings.SmtpHost,
                     _settings.SmtpPort,
-                    SecureSocketOptions.SslOnConnect);
+                    SecureSocketOptions.StartTls);
 
                 await client.AuthenticateAsync(_settings.SenderEmail, _settings.SenderPassword);
                 await client.SendAsync(message);
