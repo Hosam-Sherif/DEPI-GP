@@ -570,7 +570,8 @@ namespace Mazaad.Infrastructure.Services.Auth
                     CompanyId = user.CompanyId,
                     CompanyName = user.Company?.CompanyName,
                     Roles = roles,
-                    TwoFactorEnabled = user.TwoFactorEnabled
+                    TwoFactorEnabled = user.TwoFactorEnabled,
+                    ProfilePictureUrl = user.ProfilePictureUrl
                 }
             });
         }

@@ -41,13 +41,12 @@ namespace Mazaad.Infrastructure.Services
 
                 using var client = new SmtpClient();
 
-                // ✅ بنستخدم SmtpPort من الـ settings بدل الـ hardcoded 465
                 await client.ConnectAsync(
                     _settings.SmtpHost,
                     _settings.SmtpPort,
-                    SecureSocketOptions.StartTls);
+                    SecureSocketOptions.SslOnConnect);
 
-                await client.AuthenticateAsync(_settings.SenderEmail, _settings.SenderPassword);
+                await client.AuthenticateAsync("resend", _settings.SenderPassword);
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
 

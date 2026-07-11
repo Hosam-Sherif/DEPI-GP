@@ -25,5 +25,6 @@ namespace Mazaad.Application.DTOs.Auth
         public string? CompanyName { get; set; }
         public IEnumerable<string> Roles { get; set; } = Enumerable.Empty<string>();
         public bool TwoFactorEnabled { get; set; }
+        public string? ProfilePictureUrl { get; set; }
     }
 }
