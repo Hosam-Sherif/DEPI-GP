@@ -1,5 +1,6 @@
 // Mazaad.API/Program.cs
-using Mazaad.Infrastructure.Services.Payment;
+using Application.Interfaces;
+using Infrastructure.Services;
 using Mazaad.API.Hubs;
 using Mazaad.Application.Common;
 using Mazaad.Application.Interfaces;
@@ -13,6 +14,7 @@ using Mazaad.Infrastructure.Persistence.Repositories;
 using Mazaad.Infrastructure.Services;
 using Mazaad.Infrastructure.Services.Auth;
 using Mazaad.Infrastructure.Services.Inventory;
+using Mazaad.Infrastructure.Services.Payment;
 using Mazaad.Infrastructure.Services.SalesOperations;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -201,6 +203,7 @@ namespace Mazaad.API
             builder.Services.AddScoped<IImageService, CloudinaryImageService>();
             builder.Services.AddScoped<IProfileService, ProfileService>();
 
+            builder.Services.AddScoped<ITelegramService, TelegramService>();
             // ─── Email ────────────────────────────────────────────────────────
             builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
             builder.Services.AddScoped<IEmailService, EmailService>();

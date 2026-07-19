@@ -44,8 +44,18 @@ namespace Mazaad.Domain.Models
         /// <summary>Count of bids placed, incremented on each successful bid</summary>
         public int BidCount { get; set; }
 
-        public ListingStatus Status { get; set; } = ListingStatus.Upcoming;
+        public ListingStatus Status { get; set; } = ListingStatus.PendingApproval;
         public ListingCondition Condition { get; set; } = ListingCondition.New;
+
+        /// <summary>SuperAdmin user Id who approved/rejected this listing. Null while pending.</summary>
+        public int? ApprovedByUserId { get; set; }
+
+        /// <summary>When the SuperAdmin approved or rejected this listing. Null while pending.</summary>
+        public DateTime? ApprovedAt { get; set; }
+
+        /// <summary>Required when the SuperAdmin rejects the listing.</summary>
+        [MaxLength(500)]
+        public string? RejectionReason { get; set; }
 
         /// <summary>Primary image URL for the marketplace card</summary>
         [Column("image_url")]

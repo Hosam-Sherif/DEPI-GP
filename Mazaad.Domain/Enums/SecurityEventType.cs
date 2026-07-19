@@ -42,5 +42,9 @@
 
         // ── Profile ──────────────────────────────────────
         ProfileUpdated = 60,
+
+        // ── Listings ─────────────────────────────────────
+        ListingApproved = 70,
+        ListingRejected = 71,
     }
 }

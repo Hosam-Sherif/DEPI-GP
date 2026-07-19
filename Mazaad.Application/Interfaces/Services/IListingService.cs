@@ -1,3 +1,4 @@
+using Mazaad.Application.Common;
 using Mazaad.Application.DTOs;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
@@ -38,5 +39,14 @@ namespace Mazaad.Application.Interfaces.Services
         /// or is already Ended/Cancelled.
         /// </summary>
         Task<EndAuctionResultDto?> EndListingNowAsync(int id, int companyId);
+
+        /// <summary>SuperAdmin queue: listings currently awaiting approval, oldest first.</summary>
+        Task<IEnumerable<PendingListingDto>> GetPendingListingsAsync();
+
+        /// <summary>
+        /// SuperAdmin approves or rejects a PendingApproval listing.
+        /// Approving moves it to Upcoming/Active (based on StartDate); rejecting moves it to Rejected.
+        /// </summary>
+        Task<Result> ApproveListingAsync(int listingId, int adminUserId, ApproveListingDto dto, string ipAddress);
     }
 }

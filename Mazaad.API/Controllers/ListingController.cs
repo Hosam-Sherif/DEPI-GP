@@ -166,6 +166,36 @@ namespace Mazaad.API.Controllers
             return Ok(new { imageUrl = updatedListing.ImageUrl });
         }
 
+        /// <summary>
+        /// SuperAdmin queue: listings awaiting approval before they can go live.
+        /// </summary>
+        [HttpGet("admin/pending")]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> GetPending()
+        {
+            var pending = await _listingService.GetPendingListingsAsync();
+            return Ok(pending);
+        }
+
+        /// <summary>
+        /// SuperAdmin approves or rejects a pending listing.
+        /// Approving moves it to Upcoming/Active so it can go live; rejecting requires a reason.
+        /// </summary>
+        [HttpPatch("{id}/approve")]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> Approve(int id, [FromBody] ApproveListingDto dto)
+        {
+            var adminUserId = GetCurrentUserId();
+            if (adminUserId == null)
+                return Unauthorized(new { error = "A valid admin account is required." });
+
+            var result = await _listingService.ApproveListingAsync(id, adminUserId.Value, dto, GetIpAddress());
+            if (!result.Succeeded)
+                return BadRequest(new { error = result.Error });
+
+            return NoContent();
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────────
 
         private int? GetCurrentCompanyId()
@@ -174,5 +204,16 @@ namespace Mazaad.API.Controllers
             if (string.IsNullOrWhiteSpace(claim)) return null;
             return int.TryParse(claim, out var id) && id > 0 ? id : null;
         }
+
+        private int? GetCurrentUserId()
+        {
+            var claim = User.FindFirst("uid")?.Value;
+            return int.TryParse(claim, out var id) ? id : null;
+        }
+
+        private string GetIpAddress() =>
+            Request.Headers.TryGetValue("X-Forwarded-For", out var forwarded)
+                ? forwarded.ToString()
+                : HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 }

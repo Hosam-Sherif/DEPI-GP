@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Mazaad.Application.Common;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Enums;
@@ -19,12 +20,18 @@ namespace Mazaad.Infrastructure.Services
         private readonly AppDbContext _context;
         private readonly IImageService _imageService;
         private readonly IHubContext<AuctionHub> _hubContext;
+        private readonly ISecurityLogService _securityLog;
 
-        public ListingService(AppDbContext context, IImageService imageService, IHubContext<AuctionHub> hubContext)
+        public ListingService(
+            AppDbContext context,
+            IImageService imageService,
+            IHubContext<AuctionHub> hubContext,
+            ISecurityLogService securityLog)
         {
             _context = context;
             _imageService = imageService;
             _hubContext = hubContext;
+            _securityLog = securityLog;
         }
 
         // ─── Marketplace Grid ──────────────────────────────────────────────────────
@@ -49,6 +56,7 @@ namespace Mazaad.Infrastructure.Services
         {
             var listing = await _context.Listings.FindAsync(id);
             if (listing == null || listing.IsDeleted) return null;
+            if (listing.Status == ListingStatus.PendingApproval || listing.Status == ListingStatus.Rejected) return null;
 
             return MapToResponseDto(listing);
         }
@@ -67,6 +75,7 @@ namespace Mazaad.Infrastructure.Services
                 .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
 
             if (listing == null) return null;
+            if (listing.Status == ListingStatus.PendingApproval || listing.Status == ListingStatus.Rejected) return null;
 
             return new ListingDetailDto
             {
@@ -136,7 +145,8 @@ namespace Mazaad.Infrastructure.Services
                 EndDate = EnsureUtc(request.EndDate),
                 CurrentHighestBid = request.StartingPrice,
                 ImageUrl = "",
-                Status = EnsureUtc(request.StartDate) > DateTime.UtcNow ? ListingStatus.Upcoming : ListingStatus.Active,
+                // كل listing جديد يبدأ PendingApproval ومش هيظهر أو ينزل الا لما SuperAdmin يوافق عليه
+                Status = ListingStatus.PendingApproval,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
                 IsDeleted = false
@@ -309,6 +319,72 @@ namespace Mazaad.Infrastructure.Services
             return result;
         }
 
+        // ─── SuperAdmin: Approval Queue ─────────────────────────────────────────────
+
+        public async Task<IEnumerable<PendingListingDto>> GetPendingListingsAsync()
+        {
+            var listings = await _context.Listings
+                .Include(l => l.Category)
+                .Include(l => l.Company)
+                .Where(l => !l.IsDeleted && l.Status == ListingStatus.PendingApproval)
+                .OrderBy(l => l.CreatedAt)
+                .ToListAsync();
+
+            return listings.Select(l => new PendingListingDto
+            {
+                Id = l.Id,
+                Title = l.Title,
+                CompanyName = l.Company.CompanyName,
+                CategoryName = l.Category.CategoryName,
+                StartingPrice = l.CurrentHighestBid,
+                BaseCurrency = l.BaseCurrency,
+                UnitOfMeasure = l.UnitOfMeasure,
+                StartDate = DateTime.SpecifyKind(l.StartDate, DateTimeKind.Utc),
+                EndDate = DateTime.SpecifyKind(l.EndDate, DateTimeKind.Utc),
+                CreatedAt = l.CreatedAt
+            });
+        }
+
+        // ─── SuperAdmin: Approve or Reject ──────────────────────────────────────────
+
+        public async Task<Result> ApproveListingAsync(int listingId, int adminUserId, ApproveListingDto dto, string ipAddress)
+        {
+            var listing = await _context.Listings.FindAsync(listingId);
+            if (listing == null || listing.IsDeleted)
+                return Result.Failure("Listing not found.");
+
+            if (listing.Status != ListingStatus.PendingApproval)
+                return Result.Failure("Listing is not pending approval.");
+
+            if (!dto.Approved && string.IsNullOrWhiteSpace(dto.RejectionReason))
+                return Result.Failure("Rejection reason is required.");
+
+            var now = DateTime.UtcNow;
+
+            listing.Status = dto.Approved
+                ? (EnsureUtc(listing.StartDate) > now ? ListingStatus.Upcoming : ListingStatus.Active)
+                : ListingStatus.Rejected;
+
+            listing.ApprovedByUserId = adminUserId;
+            listing.ApprovedAt = now;
+            listing.RejectionReason = dto.Approved ? null : dto.RejectionReason;
+            listing.UpdatedAt = now;
+
+            await _context.SaveChangesAsync();
+
+            await _securityLog.LogAsync(
+                dto.Approved
+                    ? SecurityEventType.ListingApproved
+                    : SecurityEventType.ListingRejected,
+                success: true,
+                ipAddress: ipAddress,
+                userId: adminUserId,
+                details: $"Listing: {listing.Title} (Id={listing.Id})" +
+                         (dto.Approved ? "" : $" | Reason: {dto.RejectionReason}"));
+
+            return Result.Success();
+        }
+
         // ─── Private Helpers ──────────────────────────────────────────────────────
 
         private static DateTime EnsureUtc(DateTime dt) => dt.Kind switch
@@ -326,7 +402,16 @@ namespace Mazaad.Infrastructure.Services
                 .Where(l => !l.IsDeleted);
 
             if (companyId.HasValue)
+            {
+                // "My Listings" dashboard: company should still see its own pending/rejected listings
                 query = query.Where(l => l.CompanyId == companyId.Value);
+            }
+            else
+            {
+                // Public marketplace: never show a listing that hasn't been approved yet
+                query = query.Where(l => l.Status != ListingStatus.PendingApproval
+                                       && l.Status != ListingStatus.Rejected);
+            }
 
             if (filter.CategoryId.HasValue)
                 query = query.Where(l => l.CategoryId == filter.CategoryId.Value);

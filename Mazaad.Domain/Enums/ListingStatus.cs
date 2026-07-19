@@ -5,6 +5,8 @@ namespace Mazaad.Domain.Enums
         Upcoming = 0,
         Active = 1,
         Ended = 2,
-        Cancelled = 3
+        Cancelled = 3,
+        PendingApproval = 4,
+        Rejected = 5
     }
 }
