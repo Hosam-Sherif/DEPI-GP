@@ -168,7 +168,7 @@ namespace Mazaad.Infrastructure.Services.Auth
             return Result<AuthResponseDto>.Success(new AuthResponseDto
             {
                 AccessToken = accessToken,
-                AccessTokenExpiry = DateTime.UtcNow.AddMinutes(15),
+                AccessTokenExpiry = DateTime.UtcNow.AddMinutes(10080),
                 User = new UserInfoDto
                 {
                     Id = user.Id,
