@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Mazaad.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260702214310_User")]
-    partial class User
+    [Migration("20260720212443_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -192,7 +192,8 @@ namespace Mazaad.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("BidAmountPerUnit")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<int?>("BuyerCompanyId")
                         .HasColumnType("int");
@@ -210,13 +211,15 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("Quantity")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
                     b.Property<decimal>("TotalBidAmount")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<bool>("WinningBid")
                         .HasColumnType("bit");
@@ -278,7 +281,8 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("bit");
 
                     b.Property<decimal>("CommissionRate")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(8, 4)
+                        .HasColumnType("decimal(8,4)");
 
                     b.Property<DateTime>("EffectiveFrom")
                         .HasColumnType("datetime2");
@@ -287,10 +291,12 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal>("MaxAmount")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal>("MinAmount")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<string>("PolicyName")
                         .IsRequired()
@@ -299,6 +305,30 @@ namespace Mazaad.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("CommissionPolicies");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Active = true,
+                            CommissionRate = 0.02m,
+                            EffectiveFrom = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            EffectiveTo = new DateTime(2030, 12, 31, 0, 0, 0, 0, DateTimeKind.Utc),
+                            MaxAmount = 9999999m,
+                            MinAmount = 0m,
+                            PolicyName = "Standard 2%"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Active = true,
+                            CommissionRate = 0.015m,
+                            EffectiveFrom = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            EffectiveTo = new DateTime(2030, 12, 31, 0, 0, 0, 0, DateTimeKind.Utc),
+                            MaxAmount = 99999999m,
+                            MinAmount = 500000m,
+                            PolicyName = "Premium 1.5% (High-Value)"
+                        });
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Companies", b =>
@@ -431,6 +461,88 @@ namespace Mazaad.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("IndustryTypes");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Steel & Metals",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Plastics & Polymers",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Construction",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Chemicals",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Agriculture",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Electronics",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Textiles",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 8,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Food & Beverages",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 9,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Energy & Fuel",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = 10,
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            IndustryName = "Logistics",
+                            IsDeleted = false,
+                            UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.InventoryItem", b =>
@@ -451,7 +563,8 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal?>("current_market_price")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<string>("description")
                         .IsRequired()
@@ -464,14 +577,16 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("minimum_auction_price")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<string>("name")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("quantity")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("status")
                         .HasColumnType("int");
@@ -500,8 +615,15 @@ namespace Mazaad.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ApprovedByUserId")
+                        .HasColumnType("int");
+
                     b.Property<decimal>("AvailableQuantity")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<string>("BaseCurrency")
                         .IsRequired()
@@ -524,7 +646,8 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal>("CurrentHighestBid")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -552,10 +675,16 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("nvarchar(300)");
 
                     b.Property<decimal>("MinOrderQuantity")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal>("PurityPercentage")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
@@ -630,6 +759,98 @@ namespace Mazaad.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("MaterialCategories");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CategoryName = "Carbon Steel",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Structural and engineering carbon steel",
+                            UnitOfMeasure = "Ton",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CategoryName = "Stainless Steel",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Corrosion-resistant stainless steel grades",
+                            UnitOfMeasure = "Ton",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CategoryName = "Copper & Alloys",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Pure copper and copper-based alloys",
+                            UnitOfMeasure = "Ton",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CategoryName = "Aluminum",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Aluminum sheets, coils and extrusions",
+                            UnitOfMeasure = "Ton",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CategoryName = "PVC Resin",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Polyvinyl chloride for pipes and profiles",
+                            UnitOfMeasure = "Ton",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CategoryName = "HDPE / LDPE",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Polyethylene pellets for packaging & pipes",
+                            UnitOfMeasure = "Ton",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CategoryName = "Cement & Clinker",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Ordinary Portland cement and clinker",
+                            UnitOfMeasure = "Ton",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 8,
+                            CategoryName = "Chemicals — Solvents",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Industrial organic and inorganic solvents",
+                            UnitOfMeasure = "L",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 9,
+                            CategoryName = "Grains & Pulses",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Wheat, corn, lentils and agricultural grains",
+                            UnitOfMeasure = "Ton",
+                            image_url = ""
+                        },
+                        new
+                        {
+                            Id = 10,
+                            CategoryName = "Crude Oil Derivatives",
+                            CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Fuel oil, naphtha and petroleum distillates",
+                            UnitOfMeasure = "Barrel",
+                            image_url = ""
+                        });
                 });
 
             modelBuilder.Entity("Mazaad.Domain.Models.Messages", b =>
@@ -710,10 +931,12 @@ namespace Mazaad.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("AgreedQuantity")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<decimal>("AgreedUnitPrice")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("AppliedPolicyId")
                         .HasColumnType("int");
@@ -733,7 +956,8 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal>("PlatformFee")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<int>("SellerCompanyId")
                         .HasColumnType("int");
@@ -742,7 +966,8 @@ namespace Mazaad.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("TotalAmount")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
@@ -769,7 +994,8 @@ namespace Mazaad.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -857,6 +1083,150 @@ namespace Mazaad.Infrastructure.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AwardedOfferId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("BaseCurrency")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("BuyerCompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("DeadlineDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeliveryLocation")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal?>("MaxBudgetPerUnit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("RequiredQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TechnicalSpecs")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UnitOfMeasure")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuyerCompanyId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("DeadlineDate");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("ReverseAuctions");
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuctionOffer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("DeliveryDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DeliveryTerms")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("IsAwarded")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("OfferedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("PricePerUnit")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("ReverseAuctionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SupplierCompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierCompanyId");
+
+                    b.HasIndex("ReverseAuctionId", "SupplierCompanyId")
+                        .IsUnique();
+
+                    b.ToTable("ReverseAuctionOffers");
+                });
+
             modelBuilder.Entity("Mazaad.Domain.Models.SecurityLog", b =>
                 {
                     b.Property<int>("Id")
@@ -898,6 +1268,58 @@ namespace Mazaad.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("SecurityLogs");
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.Store", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Color")
+                        .IsRequired()
+                        .HasMaxLength(7)
+                        .HasColumnType("nvarchar(7)");
+
+                    b.Property<int>("CompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LogoUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique();
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("Stores");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
@@ -1226,6 +1648,44 @@ namespace Mazaad.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuction", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.Companies", "BuyerCompany")
+                        .WithMany()
+                        .HasForeignKey("BuyerCompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Mazaad.Domain.Models.Material_Categories", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("BuyerCompany");
+
+                    b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuctionOffer", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.ReverseAuction", "ReverseAuction")
+                        .WithMany("Offers")
+                        .HasForeignKey("ReverseAuctionId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Mazaad.Domain.Models.Companies", "SupplierCompany")
+                        .WithMany()
+                        .HasForeignKey("SupplierCompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("ReverseAuction");
+
+                    b.Navigation("SupplierCompany");
+                });
+
             modelBuilder.Entity("Mazaad.Domain.Models.SecurityLog", b =>
                 {
                     b.HasOne("Mazaad.Domain.Models.ApplicationUser", "User")
@@ -1234,6 +1694,17 @@ namespace Mazaad.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.Store", b =>
+                {
+                    b.HasOne("Mazaad.Domain.Models.Companies", "Company")
+                        .WithOne("Store")
+                        .HasForeignKey("Mazaad.Domain.Models.Store", "CompanyId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Company");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<int>", b =>
@@ -1329,6 +1800,8 @@ namespace Mazaad.Infrastructure.Migrations
 
                     b.Navigation("SellerChatChannels");
 
+                    b.Navigation("Store");
+
                     b.Navigation("Users");
                 });
 
@@ -1352,6 +1825,11 @@ namespace Mazaad.Infrastructure.Migrations
             modelBuilder.Entity("Mazaad.Domain.Models.Orders", b =>
                 {
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuction", b =>
+                {
+                    b.Navigation("Offers");
                 });
 #pragma warning restore 612, 618
         }
