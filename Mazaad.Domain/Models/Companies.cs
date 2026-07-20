@@ -51,6 +51,7 @@ namespace Mazaad.Domain.Models
 
         public ICollection<Listings> Listings { get; set; } = new HashSet<Listings>();
         public ICollection<Bids> Bids { get; set; } = new HashSet<Bids>();
+        public Store? Store { get; set; }
 
         public virtual ICollection<Orders> SalesOrders { get; set; } = new HashSet<Orders>();
         public virtual ICollection<Orders> PurchaseOrders { get; set; } = new HashSet<Orders>();

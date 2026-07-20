@@ -42,6 +42,8 @@ namespace Mazaad.Infrastructure.Persistence
         // ── Reverse Auction ───────────────────────────────────────────────────
         public DbSet<ReverseAuction> ReverseAuctions { get; set; }
         public DbSet<ReverseAuctionOffer> ReverseAuctionOffers { get; set; }
+        // ── Store ──────────────────────────────────────────────────────────────────
+        public DbSet<Store> Stores { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -129,7 +131,7 @@ namespace Mazaad.Infrastructure.Persistence
             // ── Commission_Policies ────────────────────────────────────────────
             modelBuilder.Entity<Commission_Policies>(cp =>
             {
-                cp.Property(x => x.CommissionRate).HasPrecision(5, 4);
+                cp.Property(x => x.CommissionRate).HasPrecision(8, 4);
                 cp.Property(x => x.MinAmount).HasPrecision(18, 4);
                 cp.Property(x => x.MaxAmount).HasPrecision(18, 4);
             });
@@ -259,6 +261,20 @@ namespace Mazaad.Infrastructure.Persistence
                 // قاعدة عمل: عرض واحد فقط لكل مورّد لكل طلب
                 o.HasIndex(x => new { x.ReverseAuctionId, x.SupplierCompanyId }).IsUnique();
                 o.HasIndex(x => x.SupplierCompanyId);
+            });
+
+            // ── Store ─────────────────────────────────────────────────────────────────
+            modelBuilder.Entity<Store>(b =>
+            {
+                b.HasKey(s => s.Id);
+
+                b.HasOne(s => s.Company)
+                 .WithOne(c => c.Store)
+                 .HasForeignKey<Store>(s => s.CompanyId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasIndex(s => s.Slug).IsUnique();
+                b.HasIndex(s => s.CompanyId).IsUnique(); // شركة واحدة = متجر واحد
             });
 
             // ── RefreshToken ──────────────────────────────────────────────────

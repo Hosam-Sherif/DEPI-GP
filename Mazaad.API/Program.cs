@@ -215,6 +215,7 @@ namespace Mazaad.API
 
             // ─── Employee ─────────────────────────────────────────────────────
             builder.Services.AddScoped<IEmployeeService, EmployeeService>();
+            builder.Services.AddScoped<IStoreService, StoreService>();
 
             // ─── Payment (Paymob) ─────────────────────────────────────────────
             builder.Services.Configure<PaymobOptions>(
