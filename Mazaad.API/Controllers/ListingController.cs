@@ -72,8 +72,19 @@ namespace Mazaad.API.Controllers
             if (companyId == null)
                 return Unauthorized(new { error = "A valid company account is required to create listings." });
 
-            var created = await _listingService.CreateListingAsync(companyId.Value, request);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            try
+            {
+                var created = await _listingService.CreateListingAsync(companyId.Value, request);
+                return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "An unexpected error occurred.", detail = ex.Message });
+            }
         }
 
         /// <summary>Update a listing's mutable fields. Only members of the owning company can update.</summary>
@@ -85,9 +96,24 @@ namespace Mazaad.API.Controllers
             if (companyId == null)
                 return Unauthorized(new { error = "A valid company account is required to update listings." });
 
-            var updated = await _listingService.UpdateListingAsync(id, companyId.Value, request);
-            if (updated == null) return NotFound(new { error = "Listing not found or you do not own it." });
-            return Ok(updated);
+            try
+            {
+                var updated = await _listingService.UpdateListingAsync(id, companyId.Value, request);
+                if (updated == null) return NotFound(new { error = "Listing not found or you do not own it." });
+                return Ok(updated);
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict(new { error = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "An unexpected error occurred.", detail = ex.Message });
+            }
         }
 
         /// <summary>

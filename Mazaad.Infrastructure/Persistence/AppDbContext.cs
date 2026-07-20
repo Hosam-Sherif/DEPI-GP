@@ -39,6 +39,10 @@ namespace Mazaad.Infrastructure.Persistence
         public DbSet<Material_Categories> MaterialCategories { get; set; }
         public DbSet<InventoryItem> InventoryItems { get; set; }
 
+        // ── Reverse Auction ───────────────────────────────────────────────────
+        public DbSet<ReverseAuction> ReverseAuctions { get; set; }
+        public DbSet<ReverseAuctionOffer> ReverseAuctionOffers { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -69,12 +73,28 @@ namespace Mazaad.Infrastructure.Persistence
             });
 
             // ── Bids ──────────────────────────────────────────────────────────
-            modelBuilder.Entity<Bids>()
-                .HasOne(b => b.BuyerCompany)
-                .WithMany(c => c.Bids)
-                .HasForeignKey(b => b.BuyerCompanyId)
-                .OnDelete(DeleteBehavior.NoAction)
-                .IsRequired(false);   
+            modelBuilder.Entity<Bids>(b =>
+            {
+                b.HasOne(bid => bid.BuyerCompany)
+                 .WithMany(c => c.Bids)
+                 .HasForeignKey(bid => bid.BuyerCompanyId)
+                 .OnDelete(DeleteBehavior.NoAction)
+                 .IsRequired(false);
+
+                b.Property(bid => bid.BidAmountPerUnit).HasPrecision(18, 4);
+                b.Property(bid => bid.Quantity).HasPrecision(18, 4);
+                b.Property(bid => bid.TotalBidAmount).HasPrecision(18, 4);
+            });
+
+            // ── Listings ─────────────────────────────────────────────────────
+            modelBuilder.Entity<Listings>(l =>
+            {
+                l.Property(x => x.CurrentHighestBid).HasPrecision(18, 4);
+                l.Property(x => x.MinOrderQuantity).HasPrecision(18, 4);
+                l.Property(x => x.AvailableQuantity).HasPrecision(18, 4);
+                l.Property(x => x.PurityPercentage).HasPrecision(5, 2);
+            });
+
             // ── RefreshToken ──────────────────────────────────────────────────
             modelBuilder.Entity<RefreshToken>(b =>
             {
@@ -101,6 +121,36 @@ namespace Mazaad.Infrastructure.Persistence
                 b.HasIndex(s => s.CreatedAt);
                 b.HasIndex(s => s.EventType);
                 b.HasIndex(s => s.UserId);
+            });
+
+            // ── Payments ─────────────────────────────────────────────────────
+            modelBuilder.Entity<Payments>().Property(x => x.Amount).HasPrecision(18, 4);
+
+            // ── Commission_Policies ────────────────────────────────────────────
+            modelBuilder.Entity<Commission_Policies>(cp =>
+            {
+                cp.Property(x => x.CommissionRate).HasPrecision(5, 4);
+                cp.Property(x => x.MinAmount).HasPrecision(18, 4);
+                cp.Property(x => x.MaxAmount).HasPrecision(18, 4);
+            });
+
+            // ── InventoryItem ──────────────────────────────────────────────────
+            modelBuilder.Entity<InventoryItem>(inv =>
+            {
+                inv.Property(x => x.quantity).HasPrecision(18, 4);
+                inv.Property(x => x.minimum_auction_price).HasPrecision(18, 4);
+                inv.Property(x => x.current_market_price).HasPrecision(18, 4);
+            });
+            modelBuilder.Entity<RefreshToken>(b =>
+            {
+                b.HasKey(r => r.Id);
+
+                b.HasOne(r => r.User)
+                 .WithMany(u => u.RefreshTokens)
+                 .HasForeignKey(r => r.UserId)
+                 .OnDelete(DeleteBehavior.Cascade);
+
+                b.HasIndex(r => r.Token).IsUnique();
             });
 
             // ── CompanyDocument ───────────────────────────────────────────────
@@ -160,12 +210,82 @@ namespace Mazaad.Infrastructure.Persistence
                 .HasForeignKey(o => o.BuyerCompanyId)
                 .OnDelete(DeleteBehavior.NoAction);
 
+            modelBuilder.Entity<Orders>(o =>
+            {
+                o.Property(x => x.AgreedQuantity).HasPrecision(18, 4);
+                o.Property(x => x.AgreedUnitPrice).HasPrecision(18, 4);
+                o.Property(x => x.TotalAmount).HasPrecision(18, 4);
+                o.Property(x => x.PlatformFee).HasPrecision(18, 4);
+            });
+
+
+            // ── ReverseAuction ────────────────────────────────────────────────
+            modelBuilder.Entity<ReverseAuction>(ra =>
+            {
+                ra.Property(x => x.RequiredQuantity).HasPrecision(18, 4);
+                ra.Property(x => x.MaxBudgetPerUnit).HasPrecision(18, 4);
+
+                ra.HasOne(x => x.BuyerCompany)
+                  .WithMany()
+                  .HasForeignKey(x => x.BuyerCompanyId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+                ra.HasOne(x => x.Category)
+                  .WithMany()
+                  .HasForeignKey(x => x.CategoryId)
+                  .OnDelete(DeleteBehavior.NoAction);
+
+                ra.HasMany(x => x.Offers)
+                  .WithOne(o => o.ReverseAuction)
+                  .HasForeignKey(o => o.ReverseAuctionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+                ra.HasIndex(x => x.Status);
+                ra.HasIndex(x => x.BuyerCompanyId);
+                ra.HasIndex(x => x.DeadlineDate);
+            });
+
+            modelBuilder.Entity<ReverseAuctionOffer>(o =>
+            {
+                o.Property(x => x.PricePerUnit).HasPrecision(18, 4);
+                o.Property(x => x.TotalPrice).HasPrecision(18, 4);
+                o.Property(x => x.OfferedQuantity).HasPrecision(18, 4);
+
+                o.HasOne(x => x.SupplierCompany)
+                 .WithMany()
+                 .HasForeignKey(x => x.SupplierCompanyId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                // قاعدة عمل: عرض واحد فقط لكل مورّد لكل طلب
+                o.HasIndex(x => new { x.ReverseAuctionId, x.SupplierCompanyId }).IsUnique();
+                o.HasIndex(x => x.SupplierCompanyId);
+            });
+
+            // ── RefreshToken ──────────────────────────────────────────────────
+            foreach (var relationship in modelBuilder.Model.GetEntityTypes()
+                         .SelectMany(e => e.GetForeignKeys()))
+            {
+                if (relationship.DeleteBehavior == DeleteBehavior.Cascade
+                    && relationship.DeclaringEntityType.ClrType != typeof(RefreshToken))
+                {
+                    relationship.DeleteBehavior = DeleteBehavior.NoAction;
+                }
+            }
+
+
             // ── Bids ──────────────────────────────────────────────────────────
-            modelBuilder.Entity<Bids>()
-                .HasOne(b => b.BuyerCompany)
-                .WithMany(c => c.Bids)
-                .HasForeignKey(b => b.BuyerCompanyId)
-                .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<Bids>(b =>
+            {
+                b.HasOne(bid => bid.BuyerCompany)
+                 .WithMany(c => c.Bids)
+                 .HasForeignKey(bid => bid.BuyerCompanyId)
+                 .OnDelete(DeleteBehavior.NoAction)
+                 .IsRequired(false);
+
+                b.Property(bid => bid.BidAmountPerUnit).HasPrecision(18, 4);
+                b.Property(bid => bid.Quantity).HasPrecision(18, 4);
+                b.Property(bid => bid.TotalBidAmount).HasPrecision(18, 4);
+            });
 
             // NoAction على كل الـ relationships الباقية
             foreach (var relationship in modelBuilder.Model.GetEntityTypes()
@@ -177,6 +297,8 @@ namespace Mazaad.Infrastructure.Persistence
                     relationship.DeleteBehavior = DeleteBehavior.NoAction;
                 }
             }
+
+
 
             // ── Seed Roles ────────────────────────────────────────────────────
             SeedRoles(modelBuilder);
@@ -221,8 +343,64 @@ namespace Mazaad.Infrastructure.Persistence
         }
 
         // باقي الـ seed methods من الكود الأصلي
-        private static void SeedIndustryTypes(ModelBuilder modelBuilder) { /* كما هي */ }
-        private static void SeedMaterialCategories(ModelBuilder modelBuilder) { /* كما هي */ }
-        private static void SeedCommissionPolicies(ModelBuilder modelBuilder) { /* كما هي */ }
+        private static void SeedIndustryTypes(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<IndustryType>().HasData(
+                new IndustryType { Id = 1, IndustryName = "Steel & Metals", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 2, IndustryName = "Plastics & Polymers", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 3, IndustryName = "Construction", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 4, IndustryName = "Chemicals", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 5, IndustryName = "Agriculture", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 6, IndustryName = "Electronics", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 7, IndustryName = "Textiles", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 8, IndustryName = "Food & Beverages", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 9, IndustryName = "Energy & Fuel", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false },
+                new IndustryType { Id = 10, IndustryName = "Logistics", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), UpdatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc), IsDeleted = false }
+            );
+        }
+
+        private static void SeedMaterialCategories(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Material_Categories>().HasData(
+                new Material_Categories { Id = 1, CategoryName = "Carbon Steel", Description = "Structural and engineering carbon steel", UnitOfMeasure = "Ton", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 2, CategoryName = "Stainless Steel", Description = "Corrosion-resistant stainless steel grades", UnitOfMeasure = "Ton", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 3, CategoryName = "Copper & Alloys", Description = "Pure copper and copper-based alloys", UnitOfMeasure = "Ton", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 4, CategoryName = "Aluminum", Description = "Aluminum sheets, coils and extrusions", UnitOfMeasure = "Ton", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 5, CategoryName = "PVC Resin", Description = "Polyvinyl chloride for pipes and profiles", UnitOfMeasure = "Ton", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 6, CategoryName = "HDPE / LDPE", Description = "Polyethylene pellets for packaging & pipes", UnitOfMeasure = "Ton", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 7, CategoryName = "Cement & Clinker", Description = "Ordinary Portland cement and clinker", UnitOfMeasure = "Ton", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 8, CategoryName = "Chemicals — Solvents", Description = "Industrial organic and inorganic solvents", UnitOfMeasure = "L", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 9, CategoryName = "Grains & Pulses", Description = "Wheat, corn, lentils and agricultural grains", UnitOfMeasure = "Ton", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+                new Material_Categories { Id = 10, CategoryName = "Crude Oil Derivatives", Description = "Fuel oil, naphtha and petroleum distillates", UnitOfMeasure = "Barrel", image_url = "", CreatedAt = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
+            );
+        }
+
+        private static void SeedCommissionPolicies(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<Commission_Policies>().HasData(
+                new Commission_Policies
+                {
+                    Id = 1,
+                    PolicyName = "Standard 2%",
+                    CommissionRate = 0.02m,   // 2% stored as decimal fraction
+                    MinAmount = 0m,
+                    MaxAmount = 9_999_999m,
+                    EffectiveFrom = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    EffectiveTo = new DateTime(2030, 12, 31, 0, 0, 0, DateTimeKind.Utc),
+                    Active = true
+                },
+                new Commission_Policies
+                {
+                    Id = 2,
+                    PolicyName = "Premium 1.5% (High-Value)",
+                    CommissionRate = 0.015m,  // 1.5% for large deals > 500K
+                    MinAmount = 500_000m,
+                    MaxAmount = 99_999_999m,
+                    EffectiveFrom = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                    EffectiveTo = new DateTime(2030, 12, 31, 0, 0, 0, DateTimeKind.Utc),
+                    Active = true
+                }
+            );
+        }
     }
 }

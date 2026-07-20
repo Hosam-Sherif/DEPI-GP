@@ -44,8 +44,15 @@ namespace Mazaad.Infrastructure.Services
             if (listing == null)
                 return Fail("Listing not found.");
 
+            // ── Business Rule #2: شركة لا تستطيع المزايدة على مزادها الخاص ──────
+            if (companyId.HasValue && listing.CompanyId == companyId.Value)
+                return Fail("A company cannot place a bid on its own auction listing.");
+
             if (listing.IsDeleted || listing.Status == ListingStatus.Cancelled)
                 return Fail("This listing is no longer active.");
+
+            if (listing.Status == ListingStatus.PendingApproval || listing.Status == ListingStatus.Rejected)
+                return Fail("This listing has not been approved yet.");
 
             if (listing.EndDate <= DateTime.UtcNow)
                 return Fail("Sorry, the auction has ended.");
@@ -56,8 +63,18 @@ namespace Mazaad.Infrastructure.Services
             if (request.Quantity > listing.AvailableQuantity)
                 return Fail($"Only {listing.AvailableQuantity} units are available.");
 
-            if (request.BidAmountPerUnit <= listing.CurrentHighestBid)
-                return Fail("Your bid must exceed the current highest bid.");
+            // For the very first bid, allow equal to starting price; for subsequent bids require strictly higher.
+            var minimumAcceptable = listing.BidCount == 0
+                ? listing.CurrentHighestBid          // first bid can match the starting price
+                : listing.CurrentHighestBid + 0.01m; // subsequent bids must beat the current highest
+
+            if (request.BidAmountPerUnit < minimumAcceptable)
+            {
+                var message = listing.BidCount == 0
+                    ? $"Your bid must be at least the starting price of {listing.CurrentHighestBid:F2}."
+                    : $"Your bid must exceed the current highest bid of {listing.CurrentHighestBid:F2}.";
+                return Fail(message);
+            }
 
             var serverComputedTotal = request.BidAmountPerUnit * request.Quantity;
 

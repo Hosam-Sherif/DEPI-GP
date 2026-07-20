@@ -202,6 +202,7 @@ namespace Mazaad.API
             builder.Services.AddSingleton<IAuctionPresenceService, AuctionPresenceService>();
             builder.Services.AddScoped<IImageService, CloudinaryImageService>();
             builder.Services.AddScoped<IProfileService, ProfileService>();
+            builder.Services.AddScoped<IReverseAuctionService, ReverseAuctionService>();
 
             builder.Services.AddScoped<ITelegramService, TelegramService>();
             // ─── Email ────────────────────────────────────────────────────────
@@ -255,6 +256,39 @@ namespace Mazaad.API
             });
 
             // ─── Build ────────────────────────────────────────────────────────
+            // ─── Rate Limiting (protect Auth & Bidding from abuse) ─────────────────
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+                // Auth endpoints: max 10 requests/minute per IP
+                options.AddFixedWindowLimiter("AuthPolicy", opt =>
+                {
+                    opt.PermitLimit = 10;
+                    opt.Window = TimeSpan.FromMinutes(1);
+                    opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                    opt.QueueLimit = 0;
+                });
+
+                // Bidding endpoints: max 30 requests/minute per IP
+                options.AddFixedWindowLimiter("BidPolicy", opt =>
+                {
+                    opt.PermitLimit = 30;
+                    opt.Window = TimeSpan.FromMinutes(1);
+                    opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+                    opt.QueueLimit = 5;
+                });
+            });
+
+            // ─── Health Checks ───────────────────────────────────────────────
+            builder.Services.AddHealthChecks();
+
+            // ─── Response Compression ──────────────────────────────────────
+            builder.Services.AddResponseCompression(opts =>
+            {
+                opts.EnableForHttps = true;
+            });
+
             var app = builder.Build();
 
             await SeedRolesAsync(app);
@@ -262,6 +296,15 @@ namespace Mazaad.API
             await SeedDemoDataAsync(app);
 
             // ─── Pipeline ─────────────────────────────────────────────────────
+            // Global exception handler (returns JSON errors instead of HTML)
+            app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
+            {
+                ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                ctx.Response.ContentType = "application/json";
+                await ctx.Response.WriteAsJsonAsync(new { error = "An unexpected server error occurred." });
+            }));
+
+            app.UseResponseCompression();
             app.UseSwagger();
             app.UseSwaggerUI(o =>
             {
@@ -271,6 +314,7 @@ namespace Mazaad.API
 
             app.UseStaticFiles();
             app.UseCors("MazaadCors");
+            app.UseRateLimiter();
             app.UseAuthentication();
             app.UseAuthorization();
             app.UseRateLimiter();
@@ -278,6 +322,7 @@ namespace Mazaad.API
             app.MapControllers();
             app.MapHub<ChatHub>("/hubs/chat");
             app.MapHub<AuctionHub>("/hubs/auction");
+            app.MapHealthChecks("/health");
 
             app.Run();
         }

@@ -864,6 +864,151 @@ namespace Mazaad.Infrastructure.Migrations
                     b.ToTable("RefreshTokens");
                 });
 
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuction", b =>
+            {
+                b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
+
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                b.Property<int?>("AwardedOfferId")
+                    .HasColumnType("int");
+
+                b.Property<string>("BaseCurrency")
+                    .IsRequired()
+                    .HasMaxLength(10)
+                    .HasColumnType("nvarchar(10)");
+
+                b.Property<int>("BuyerCompanyId")
+                    .HasColumnType("int");
+
+                b.Property<int>("CategoryId")
+                    .HasColumnType("int");
+
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
+
+                b.Property<DateTime>("DeadlineDate")
+                    .HasColumnType("datetime2");
+
+                b.Property<string>("DeliveryLocation")
+                    .IsRequired()
+                    .HasMaxLength(300)
+                    .HasColumnType("nvarchar(300)");
+
+                b.Property<string>("Description")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<bool>("IsDeleted")
+                    .HasColumnType("bit");
+
+                b.Property<decimal?>("MaxBudgetPerUnit")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("decimal(18,4)");
+
+                b.Property<decimal>("RequiredQuantity")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("decimal(18,4)");
+
+                b.Property<byte[]>("RowVersion")
+                    .IsConcurrencyToken()
+                    .IsRequired()
+                    .ValueGeneratedOnAddOrUpdate()
+                    .HasColumnType("rowversion");
+
+                b.Property<int>("Status")
+                    .HasColumnType("int");
+
+                b.Property<string>("TechnicalSpecs")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<string>("Title")
+                    .IsRequired()
+                    .HasMaxLength(200)
+                    .HasColumnType("nvarchar(200)");
+
+                b.Property<string>("UnitOfMeasure")
+                    .IsRequired()
+                    .HasMaxLength(20)
+                    .HasColumnType("nvarchar(20)");
+
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("datetime2");
+
+                b.HasKey("Id");
+
+                b.HasIndex("BuyerCompanyId");
+
+                b.HasIndex("CategoryId");
+
+                b.HasIndex("DeadlineDate");
+
+                b.HasIndex("Status");
+
+                b.ToTable("ReverseAuctions");
+            });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuctionOffer", b =>
+            {
+                b.Property<int>("Id")
+                    .ValueGeneratedOnAdd()
+                    .HasColumnType("int");
+
+                SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                b.Property<DateTime>("CreatedAt")
+                    .HasColumnType("datetime2");
+
+                b.Property<int?>("DeliveryDays")
+                    .HasColumnType("int");
+
+                b.Property<string>("DeliveryTerms")
+                    .IsRequired()
+                    .HasMaxLength(500)
+                    .HasColumnType("nvarchar(500)");
+
+                b.Property<bool>("IsAwarded")
+                    .HasColumnType("bit");
+
+                b.Property<string>("Notes")
+                    .IsRequired()
+                    .HasColumnType("nvarchar(max)");
+
+                b.Property<decimal>("OfferedQuantity")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("decimal(18,4)");
+
+                b.Property<decimal>("PricePerUnit")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("decimal(18,4)");
+
+                b.Property<int>("ReverseAuctionId")
+                    .HasColumnType("int");
+
+                b.Property<int>("SupplierCompanyId")
+                    .HasColumnType("int");
+
+                b.Property<decimal>("TotalPrice")
+                    .HasPrecision(18, 4)
+                    .HasColumnType("decimal(18,4)");
+
+                b.Property<DateTime>("UpdatedAt")
+                    .HasColumnType("datetime2");
+
+                b.HasKey("Id");
+
+                b.HasIndex("SupplierCompanyId");
+
+                b.HasIndex("ReverseAuctionId", "SupplierCompanyId")
+                    .IsUnique();
+
+                b.ToTable("ReverseAuctionOffers");
+            });
+
+
             modelBuilder.Entity("Mazaad.Domain.Models.SecurityLog", b =>
                 {
                     b.Property<int>("Id")
@@ -1233,6 +1378,45 @@ namespace Mazaad.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuction", b =>
+            {
+                b.HasOne("Mazaad.Domain.Models.Companies", "BuyerCompany")
+                    .WithMany()
+                    .HasForeignKey("BuyerCompanyId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
+
+                b.HasOne("Mazaad.Domain.Models.Material_Categories", "Category")
+                    .WithMany()
+                    .HasForeignKey("CategoryId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
+
+                b.Navigation("BuyerCompany");
+
+                b.Navigation("Category");
+            });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuctionOffer", b =>
+            {
+                b.HasOne("Mazaad.Domain.Models.ReverseAuction", "ReverseAuction")
+                    .WithMany("Offers")
+                    .HasForeignKey("ReverseAuctionId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
+
+                b.HasOne("Mazaad.Domain.Models.Companies", "SupplierCompany")
+                    .WithMany()
+                    .HasForeignKey("SupplierCompanyId")
+                    .OnDelete(DeleteBehavior.NoAction)
+                    .IsRequired();
+
+                b.Navigation("ReverseAuction");
+
+                b.Navigation("SupplierCompany");
+            });
+
+
             modelBuilder.Entity("Mazaad.Domain.Models.SecurityLog", b =>
                 {
                     b.HasOne("Mazaad.Domain.Models.ApplicationUser", "User")
@@ -1360,6 +1544,11 @@ namespace Mazaad.Infrastructure.Migrations
                 {
                     b.Navigation("Payments");
                 });
+
+            modelBuilder.Entity("Mazaad.Domain.Models.ReverseAuction", b =>
+            {
+                b.Navigation("Offers");
+            });
 #pragma warning restore 612, 618
         }
     }
