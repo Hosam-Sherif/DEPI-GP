@@ -1,3 +1,4 @@
+using Mazaad.Domain.Enums;
 using System;
 
 namespace Mazaad.Application.DTOs
@@ -19,5 +20,6 @@ namespace Mazaad.Application.DTOs
         public decimal StartingPrice { get; set; }  // ← مضاف
         public decimal CurrentHighestBid { get; set; }
         public string ImageUrl { get; set; } = string.Empty;
+        public ListingStatus Status { get; set; }
     }
 }

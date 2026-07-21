@@ -94,13 +94,13 @@ namespace Mazaad.Infrastructure.Services
                 BaseCurrency = listing.BaseCurrency,
                 CurrentHighestBid = listing.CurrentHighestBid,
                 BidCount = listing.BidCount,
-                Status = listing.Status,
+                Status = CalculateDynamicStatus(listing), // ← هنا نحسب الحالة الديناميكية
                 Condition = listing.Condition,
                 ImageUrl = listing.ImageUrl,
                 Location = listing.Location,
                 DueDiligenceUrls = listing.DueDiligenceUrls,
-                StartDate = DateTime.SpecifyKind(listing.StartDate, DateTimeKind.Utc), // ← Fix
-                EndDate = DateTime.SpecifyKind(listing.EndDate, DateTimeKind.Utc), // ← Fix
+                StartDate = DateTime.SpecifyKind(listing.StartDate, DateTimeKind.Utc),
+                EndDate = DateTime.SpecifyKind(listing.EndDate, DateTimeKind.Utc),
                 WinningBidId = listing.Bids
                     .OrderByDescending(b => b.BidAmountPerUnit)
                     .Select(b => (int?)b.Id)
@@ -145,7 +145,6 @@ namespace Mazaad.Infrastructure.Services
                 EndDate = EnsureUtc(request.EndDate),
                 CurrentHighestBid = request.StartingPrice,
                 ImageUrl = "",
-                // كل listing جديد يبدأ PendingApproval ومش هيظهر أو ينزل الا لما SuperAdmin يوافق عليه
                 Status = ListingStatus.PendingApproval,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
@@ -385,7 +384,78 @@ namespace Mazaad.Infrastructure.Services
             return Result.Success();
         }
 
+        // ─── Admin: Get All Listings Without Pagination ────────────────────────────
+
+        public async Task<IEnumerable<ListingCardDto>> GetAllListingsAdminAsync(ListingStatus? status)
+        {
+            var listings = await _context.Listings
+                .Include(l => l.Category)
+                .Include(l => l.Company)
+                .Where(l => !l.IsDeleted)
+                .OrderByDescending(l => l.CreatedAt)
+                .ToListAsync();
+
+            var result = listings.Select(l => new ListingCardDto
+            {
+                Id = l.Id,
+                Title = l.Title,
+                Description = l.Description,
+                ImageUrl = l.ImageUrl,
+                CategoryName = l.Category.CategoryName,
+                CompanyName = l.Company.CompanyName,
+                CurrentHighestBid = l.CurrentHighestBid,
+                BidCount = l.BidCount,
+                Status = CalculateDynamicStatus(l), // ← حساب الحالة هنا
+                Condition = l.Condition,
+                BaseCurrency = l.BaseCurrency,
+                UnitOfMeasure = l.UnitOfMeasure,
+                EndDate = DateTime.SpecifyKind(l.EndDate, DateTimeKind.Utc),
+                WinningBidId = l.Bids
+                    .OrderByDescending(b => b.BidAmountPerUnit)
+                    .Select(b => (int?)b.Id)
+                    .FirstOrDefault()
+            });
+
+            if (status.HasValue)
+            {
+                result = result.Where(l => l.Status == status.Value);
+            }
+
+            return result;
+        }
+
         // ─── Private Helpers ──────────────────────────────────────────────────────
+
+        /// <summary>
+        /// يحسب الحالة الوقتية الحقيقية للمزاد بناءً على الوقت الحالي والأوقات المحددة للمزاد
+        /// </summary>
+        private static ListingStatus CalculateDynamicStatus(Listings listing)
+        {
+            // لو الإدراج ملغي أو مرفوض أو منتظر موافقة نرجع حالته كما هي
+            if (listing.Status == ListingStatus.PendingApproval ||
+                listing.Status == ListingStatus.Rejected ||
+                listing.Status == ListingStatus.Cancelled)
+            {
+                return listing.Status;
+            }
+
+            var now = DateTime.UtcNow;
+            var start = EnsureUtc(listing.StartDate);
+            var end = EnsureUtc(listing.EndDate);
+
+            if (now < start)
+            {
+                return ListingStatus.Upcoming; // لسه متبدأش
+            }
+            else if (now >= start && now <= end)
+            {
+                return ListingStatus.Active; // شغال حالياً
+            }
+            else
+            {
+                return ListingStatus.Ended; // انتهى خلاص
+            }
+        }
 
         private static DateTime EnsureUtc(DateTime dt) => dt.Kind switch
         {
@@ -403,12 +473,10 @@ namespace Mazaad.Infrastructure.Services
 
             if (companyId.HasValue)
             {
-                // "My Listings" dashboard: company should still see its own pending/rejected listings
                 query = query.Where(l => l.CompanyId == companyId.Value);
             }
             else
             {
-                // Public marketplace: never show a listing that hasn't been approved yet
                 query = query.Where(l => l.Status != ListingStatus.PendingApproval
                                        && l.Status != ListingStatus.Rejected);
             }
@@ -418,9 +486,6 @@ namespace Mazaad.Infrastructure.Services
 
             if (filter.Condition.HasValue)
                 query = query.Where(l => l.Condition == filter.Condition.Value);
-
-            if (filter.Status.HasValue)
-                query = query.Where(l => l.Status == filter.Status.Value);
 
             if (filter.MinPrice.HasValue)
                 query = query.Where(l => l.CurrentHighestBid >= filter.MinPrice.Value);
@@ -442,33 +507,39 @@ namespace Mazaad.Infrastructure.Services
         private static async Task<PagedResultDto<ListingCardDto>> ToPagedCardResultAsync(
             IQueryable<Listings> query, int pageNumber, int pageSize)
         {
-            var totalCount = await query.CountAsync();
-
-            var items = await query
+            // جلب البيانات من الداتا بيز أولاً
+            var rawListings = await query
                 .OrderByDescending(l => l.CreatedAt)
+                .ToListAsync();
+
+            // تحويلها وحساب الحالة الديناميكية في الميموري
+            var cardDtos = rawListings.Select(l => new ListingCardDto
+            {
+                Id = l.Id,
+                Title = l.Title,
+                Description = l.Description,
+                ImageUrl = l.ImageUrl,
+                CategoryName = l.Category?.CategoryName ?? "",
+                CompanyName = l.Company?.CompanyName ?? "",
+                CurrentHighestBid = l.CurrentHighestBid,
+                BidCount = l.BidCount,
+                Status = CalculateDynamicStatus(l), // ← حساب الحالة
+                Condition = l.Condition,
+                BaseCurrency = l.BaseCurrency,
+                UnitOfMeasure = l.UnitOfMeasure,
+                EndDate = DateTime.SpecifyKind(l.EndDate, DateTimeKind.Utc),
+                WinningBidId = l.Bids?
+                    .OrderByDescending(b => b.BidAmountPerUnit)
+                    .Select(b => (int?)b.Id)
+                    .FirstOrDefault()
+            });
+
+            var totalCount = cardDtos.Count();
+
+            var items = cardDtos
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
-                .Select(l => new ListingCardDto
-                {
-                    Id = l.Id,
-                    Title = l.Title,
-                    Description = l.Description,
-                    ImageUrl = l.ImageUrl,
-                    CategoryName = l.Category.CategoryName,
-                    CompanyName = l.Company.CompanyName,
-                    CurrentHighestBid = l.CurrentHighestBid,
-                    BidCount = l.BidCount,
-                    Status = l.Status,
-                    Condition = l.Condition,
-                    BaseCurrency = l.BaseCurrency,
-                    UnitOfMeasure = l.UnitOfMeasure,
-                    EndDate = l.EndDate,
-                    WinningBidId = l.Bids
-                        .OrderByDescending(b => b.BidAmountPerUnit)
-                        .Select(b => (int?)b.Id)
-                        .FirstOrDefault()
-                })
-                .ToListAsync();
+                .ToList();
 
             return new PagedResultDto<ListingCardDto>
             {
@@ -479,7 +550,6 @@ namespace Mazaad.Infrastructure.Services
             };
         }
 
-        // ── Fix: SpecifyKind على StartDate و EndDate + إضافة StartingPrice ────────
         private static ListingResponseDto MapToResponseDto(Listings listing) => new ListingResponseDto
         {
             Id = listing.Id,
@@ -492,11 +562,13 @@ namespace Mazaad.Infrastructure.Services
             UnitOfMeasure = listing.UnitOfMeasure,
             PurityPercentage = listing.PurityPercentage,
             BaseCurrency = listing.BaseCurrency,
-            StartDate = DateTime.SpecifyKind(listing.StartDate, DateTimeKind.Utc), // ← Fix UTC
-            EndDate = DateTime.SpecifyKind(listing.EndDate, DateTimeKind.Utc), // ← Fix UTC
-            StartingPrice = listing.CurrentHighestBid,                                 // ← مضاف
+            StartDate = DateTime.SpecifyKind(listing.StartDate, DateTimeKind.Utc),
+            EndDate = DateTime.SpecifyKind(listing.EndDate, DateTimeKind.Utc),
+            StartingPrice = listing.CurrentHighestBid,
             CurrentHighestBid = listing.CurrentHighestBid,
-            ImageUrl = listing.ImageUrl
+            ImageUrl = listing.ImageUrl,
+            Status = CalculateDynamicStatus(listing) // ← حساب الحالة
+            
         };
     }
 }

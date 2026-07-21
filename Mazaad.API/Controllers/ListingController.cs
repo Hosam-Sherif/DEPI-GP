@@ -1,8 +1,9 @@
-using System.Security.Claims;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
+using Mazaad.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace Mazaad.API.Controllers
 {
@@ -220,6 +221,17 @@ namespace Mazaad.API.Controllers
                 return BadRequest(new { error = result.Error });
 
             return NoContent();
+        }
+        /// <summary>
+        /// SuperAdmin/Admin endpoint: returns all listings without pagination.
+        /// Filters by Status if provided; returns all statuses if null.
+        /// </summary>
+        [HttpGet("admin/all")]
+        //[Authorize(Roles = "SuperAdmin,Admin")]
+        public async Task<IActionResult> GetAllAdmin([FromQuery] ListingStatus? status)
+        {
+            var listings = await _listingService.GetAllListingsAdminAsync(status);
+            return Ok(listings);
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────────
