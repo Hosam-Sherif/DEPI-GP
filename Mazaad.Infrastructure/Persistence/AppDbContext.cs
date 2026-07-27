@@ -95,6 +95,19 @@ namespace Mazaad.Infrastructure.Persistence
                 l.Property(x => x.MinOrderQuantity).HasPrecision(18, 4);
                 l.Property(x => x.AvailableQuantity).HasPrecision(18, 4);
                 l.Property(x => x.PurityPercentage).HasPrecision(5, 2);
+
+                // A listing belongs to EITHER a company OR an individual seller.
+                l.HasOne(x => x.Company)
+                 .WithMany()
+                 .HasForeignKey(x => x.CompanyId)
+                 .OnDelete(DeleteBehavior.NoAction)
+                 .IsRequired(false);
+
+                l.HasOne(x => x.Seller)
+                 .WithMany()
+                 .HasForeignKey(x => x.SellerUserId)
+                 .OnDelete(DeleteBehavior.NoAction)
+                 .IsRequired(false);
             });
 
             // ── RefreshToken ──────────────────────────────────────────────────

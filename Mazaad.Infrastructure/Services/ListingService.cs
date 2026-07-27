@@ -44,9 +44,9 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Dashboard: My Listings ────────────────────────────────────────────────
 
-        public async Task<PagedResultDto<ListingCardDto>> GetMyListingsAsync(int companyId, ListingFilterDto filter)
+        public async Task<PagedResultDto<ListingCardDto>> GetMyListingsAsync(int? companyId, int? sellerUserId, ListingFilterDto filter)
         {
-            var query = BuildFilteredQuery(filter, companyId);
+            var query = BuildFilteredQuery(filter, companyId, sellerUserId);
             return await ToPagedCardResultAsync(query, filter.PageNumber, filter.PageSize);
         }
 
@@ -68,6 +68,7 @@ namespace Mazaad.Infrastructure.Services
             var listing = await _context.Listings
                 .Include(l => l.Category)
                 .Include(l => l.Company)
+                .Include(l => l.Seller)
                 .Include(l => l.Bids.OrderByDescending(b => b.BidAmountPerUnit).Take(5))
                     .ThenInclude(b => b.BuyerCompany)
                 .Include(l => l.Bids)
@@ -81,7 +82,8 @@ namespace Mazaad.Infrastructure.Services
             {
                 Id = listing.Id,
                 CompanyId = listing.CompanyId,
-                CompanyName = listing.Company.CompanyName,
+                CompanyName = listing.Company?.CompanyName ?? listing.Seller?.FullName ?? "Individual Seller",
+                IsIndividualSeller = listing.CompanyId == null,
                 CategoryId = listing.CategoryId,
                 CategoryName = listing.Category.CategoryName,
                 Title = listing.Title,
@@ -125,14 +127,18 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Create ───────────────────────────────────────────────────────────────
 
-        public async Task<ListingResponseDto> CreateListingAsync(int companyId, CreateListingDto request)
+        public async Task<ListingResponseDto> CreateListingAsync(int? companyId, int? sellerUserId, CreateListingDto request)
         {
+            if (!companyId.HasValue && !sellerUserId.HasValue)
+                throw new ArgumentException("Either a company account or a user account is required to create a listing.");
+
             var category = await _context.MaterialCategories.FindAsync(request.CategoryId);
             var unitOfMeasure = category?.UnitOfMeasure ?? request.UnitOfMeasure ?? "kg";
 
             var listing = new Listings
             {
                 CompanyId = companyId,
+                SellerUserId = companyId.HasValue ? null : sellerUserId,
                 CategoryId = request.CategoryId,
                 Title = request.Title,
                 Description = request.Description,
@@ -159,11 +165,11 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Update ───────────────────────────────────────────────────────────────
 
-        public async Task<ListingResponseDto?> UpdateListingAsync(int id, int companyId, CreateListingDto request)
+        public async Task<ListingResponseDto?> UpdateListingAsync(int id, int? companyId, int? sellerUserId, CreateListingDto request)
         {
             var listing = await _context.Listings.FindAsync(id);
 
-            if (listing == null || listing.IsDeleted || listing.CompanyId != companyId)
+            if (listing == null || listing.IsDeleted || !OwnsListing(listing, companyId, sellerUserId))
                 return null;
 
             var category = await _context.MaterialCategories.FindAsync(request.CategoryId);
@@ -188,20 +194,19 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Upload Image ─────────────────────────────────────────────────────────
 
-        public async Task<ListingResponseDto?> UploadListingImageAsync(int listingId, int companyId, IFormFile image)
+        public async Task<ListingResponseDto?> UploadListingImageAsync(int listingId, int? companyId, int? sellerUserId, IFormFile image)
         {
             var listing = await _context.Listings
-                .FirstOrDefaultAsync(l => l.Id == listingId
-                                       && l.CompanyId == companyId
-                                       && !l.IsDeleted);
+                .FirstOrDefaultAsync(l => l.Id == listingId && !l.IsDeleted);
 
-            if (listing == null) return null;
+            if (listing == null || !OwnsListing(listing, companyId, sellerUserId))
+                return null;
 
             using var stream = image.OpenReadStream();
             var imageUrl = await _imageService.UploadImageAsync(
                 stream,
                 image.FileName,
-                $"mazzad/listings/{companyId}"
+                companyId.HasValue ? $"mazzad/listings/{companyId}" : $"mazzad/listings/user-{sellerUserId}"
             );
 
             listing.ImageUrl = imageUrl;
@@ -213,11 +218,11 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Soft Delete ──────────────────────────────────────────────────────────
 
-        public async Task<bool> DeleteListingAsync(int id, int companyId)
+        public async Task<bool> DeleteListingAsync(int id, int? companyId, int? sellerUserId)
         {
             var listing = await _context.Listings.FindAsync(id);
 
-            if (listing == null || listing.CompanyId != companyId)
+            if (listing == null || !OwnsListing(listing, companyId, sellerUserId))
                 return false;
 
             listing.IsDeleted = true;
@@ -229,11 +234,11 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Cancel Listing ───────────────────────────────────────────────────────
 
-        public async Task<bool> CancelListingAsync(int id, int companyId)
+        public async Task<bool> CancelListingAsync(int id, int? companyId, int? sellerUserId)
         {
             var listing = await _context.Listings.FindAsync(id);
 
-            if (listing == null || listing.IsDeleted || listing.CompanyId != companyId)
+            if (listing == null || listing.IsDeleted || !OwnsListing(listing, companyId, sellerUserId))
                 return false;
 
             if (listing.Status == ListingStatus.Cancelled)
@@ -255,7 +260,7 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── End Auction Now ──────────────────────────────────────────────────────
 
-        public async Task<EndAuctionResultDto?> EndListingNowAsync(int id, int companyId)
+        public async Task<EndAuctionResultDto?> EndListingNowAsync(int id, int? companyId, int? sellerUserId)
         {
             var listing = await _context.Listings
                 .Include(l => l.Bids)
@@ -264,7 +269,7 @@ namespace Mazaad.Infrastructure.Services
                     .ThenInclude(b => b.User)
                 .FirstOrDefaultAsync(l => l.Id == id);
 
-            if (listing == null || listing.IsDeleted || listing.CompanyId != companyId)
+            if (listing == null || listing.IsDeleted || !OwnsListing(listing, companyId, sellerUserId))
                 return null;
 
             if (listing.Status == ListingStatus.Ended || listing.Status == ListingStatus.Cancelled)
@@ -325,6 +330,7 @@ namespace Mazaad.Infrastructure.Services
             var listings = await _context.Listings
                 .Include(l => l.Category)
                 .Include(l => l.Company)
+                .Include(l => l.Seller)
                 .Where(l => !l.IsDeleted && l.Status == ListingStatus.PendingApproval)
                 .OrderBy(l => l.CreatedAt)
                 .ToListAsync();
@@ -333,7 +339,8 @@ namespace Mazaad.Infrastructure.Services
             {
                 Id = l.Id,
                 Title = l.Title,
-                CompanyName = l.Company.CompanyName,
+                CompanyName = l.Company?.CompanyName ?? l.Seller?.FullName ?? "Individual Seller",
+                IsIndividualSeller = l.CompanyId == null,
                 CategoryName = l.Category.CategoryName,
                 StartingPrice = l.CurrentHighestBid,
                 BaseCurrency = l.BaseCurrency,
@@ -391,6 +398,7 @@ namespace Mazaad.Infrastructure.Services
             var listings = await _context.Listings
                 .Include(l => l.Category)
                 .Include(l => l.Company)
+                .Include(l => l.Seller)
                 .Where(l => !l.IsDeleted)
                 .OrderByDescending(l => l.CreatedAt)
                 .ToListAsync();
@@ -402,7 +410,8 @@ namespace Mazaad.Infrastructure.Services
                 Description = l.Description,
                 ImageUrl = l.ImageUrl,
                 CategoryName = l.Category.CategoryName,
-                CompanyName = l.Company.CompanyName,
+                CompanyName = l.Company?.CompanyName ?? l.Seller?.FullName ?? "Individual Seller",
+                IsIndividualSeller = l.CompanyId == null,
                 CurrentHighestBid = l.CurrentHighestBid,
                 BidCount = l.BidCount,
                 Status = CalculateDynamicStatus(l), // ← حساب الحالة هنا
@@ -457,6 +466,19 @@ namespace Mazaad.Infrastructure.Services
             }
         }
 
+        /// <summary>A listing is owned either by its company (company users) or by its
+        /// individual seller (sellerUserId). Exactly the caller's own id must match.</summary>
+        private static bool OwnsListing(Listings listing, int? companyId, int? sellerUserId)
+        {
+            if (companyId.HasValue && listing.CompanyId == companyId.Value)
+                return true;
+
+            if (sellerUserId.HasValue && listing.SellerUserId == sellerUserId.Value)
+                return true;
+
+            return false;
+        }
+
         private static DateTime EnsureUtc(DateTime dt) => dt.Kind switch
         {
             DateTimeKind.Utc => dt,
@@ -464,16 +486,21 @@ namespace Mazaad.Infrastructure.Services
             _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc)
         };
 
-        private IQueryable<Listings> BuildFilteredQuery(ListingFilterDto filter, int? companyId = null)
+        private IQueryable<Listings> BuildFilteredQuery(ListingFilterDto filter, int? companyId = null, int? sellerUserId = null)
         {
             var query = _context.Listings
                 .Include(l => l.Category)
                 .Include(l => l.Company)
+                .Include(l => l.Seller)
                 .Where(l => !l.IsDeleted);
 
             if (companyId.HasValue)
             {
                 query = query.Where(l => l.CompanyId == companyId.Value);
+            }
+            else if (sellerUserId.HasValue)
+            {
+                query = query.Where(l => l.SellerUserId == sellerUserId.Value);
             }
             else
             {
@@ -483,6 +510,11 @@ namespace Mazaad.Infrastructure.Services
 
             if (filter.CategoryId.HasValue)
                 query = query.Where(l => l.CategoryId == filter.CategoryId.Value);
+
+            // Store page filter: "show this company's listings" — only meaningful
+            // when browsing publicly (companyId/sellerUserId params are for "my listings").
+            if (filter.CompanyId.HasValue && !companyId.HasValue && !sellerUserId.HasValue)
+                query = query.Where(l => l.CompanyId == filter.CompanyId.Value);
 
             if (filter.Condition.HasValue)
                 query = query.Where(l => l.Condition == filter.Condition.Value);
@@ -520,7 +552,8 @@ namespace Mazaad.Infrastructure.Services
                 Description = l.Description,
                 ImageUrl = l.ImageUrl,
                 CategoryName = l.Category?.CategoryName ?? "",
-                CompanyName = l.Company?.CompanyName ?? "",
+                CompanyName = l.Company?.CompanyName ?? l.Seller?.FullName ?? "Individual Seller",
+                IsIndividualSeller = l.CompanyId == null,
                 CurrentHighestBid = l.CurrentHighestBid,
                 BidCount = l.BidCount,
                 Status = CalculateDynamicStatus(l), // ← حساب الحالة
@@ -554,6 +587,7 @@ namespace Mazaad.Infrastructure.Services
         {
             Id = listing.Id,
             CompanyId = listing.CompanyId,
+            SellerUserId = listing.SellerUserId,
             CategoryId = listing.CategoryId,
             Title = listing.Title,
             Description = listing.Description,
@@ -568,7 +602,7 @@ namespace Mazaad.Infrastructure.Services
             CurrentHighestBid = listing.CurrentHighestBid,
             ImageUrl = listing.ImageUrl,
             Status = CalculateDynamicStatus(listing) // ← حساب الحالة
-            
+
         };
     }
 }

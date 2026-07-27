@@ -39,8 +39,10 @@ namespace Mazaad.API.Controllers
                 if (!int.TryParse(User.FindFirst("uid")?.Value, out int userId) || userId <= 0)
                     return Unauthorized(new { success = false, message = "Invalid user token." });
 
-                if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
-                    return Unauthorized(new { success = false, message = "Only verified company users can place bids." });
+                // companyId is optional now: present for company users, null for individual bidders.
+                int? companyId = int.TryParse(User.FindFirst("companyId")?.Value, out int cid) && cid > 0
+                    ? cid
+                    : null;
 
                 var result = await _biddingService.PlaceBidAsync(userId, companyId, request);
 
@@ -87,8 +89,10 @@ namespace Mazaad.API.Controllers
                 if (!int.TryParse(User.FindFirst("uid")?.Value, out int userId) || userId <= 0)
                     return Unauthorized(new { success = false, message = "Invalid user token." });
 
-                if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
-                    return Unauthorized(new { success = false, message = "Only verified company users can place quick bids." });
+                // companyId is optional now: present for company users, null for individual bidders.
+                int? companyId = int.TryParse(User.FindFirst("companyId")?.Value, out int cid) && cid > 0
+                    ? cid
+                    : null;
 
                 var result = await _biddingService.PlaceQuickBidAsync(userId, companyId, request);
 
@@ -160,15 +164,16 @@ namespace Mazaad.API.Controllers
         }
 
         /// <summary>
-        /// Get all bids placed by the current authenticated company
+        /// Get all bids placed by the current authenticated user (works for company
+        /// users and individual bidders alike).
         /// </summary>
         [HttpGet("my-bids")]
         public async Task<IActionResult> GetMyBids()
         {
-            if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
-                return Unauthorized(new { success = false, message = "Only verified company users can view their bids." });
+            if (!int.TryParse(User.FindFirst("uid")?.Value, out int userId) || userId <= 0)
+                return Unauthorized(new { success = false, message = "Invalid user token." });
 
-            var bids = await _biddingService.GetBidsByCompanyAsync(companyId);
+            var bids = await _biddingService.GetBidsByUserAsync(userId);
             return Ok(bids);
         }
 
@@ -182,10 +187,10 @@ namespace Mazaad.API.Controllers
         [HttpDelete("{bidId}")]
         public async Task<IActionResult> DeleteBid(int bidId)
         {
-            if (!int.TryParse(User.FindFirst("companyId")?.Value, out int companyId) || companyId <= 0)
-                return Unauthorized(new { success = false, message = "Only verified company users can cancel bids." });
+            if (!int.TryParse(User.FindFirst("uid")?.Value, out int userId) || userId <= 0)
+                return Unauthorized(new { success = false, message = "Invalid user token." });
 
-            var success = await _biddingService.DeleteBidAsync(bidId, companyId);
+            var success = await _biddingService.DeleteBidAsync(bidId, userId);
 
             if (!success)
                 return BadRequest(new { success = false, message = "Unable to cancel bid." });

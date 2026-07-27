@@ -11,7 +11,12 @@ namespace Mazaad.Application.DTOs
         public string Description { get; set; } = string.Empty;
         public string ImageUrl { get; set; } = string.Empty;
         public string CategoryName { get; set; } = string.Empty;
+
+        /// <summary>Company name for company listings, or the individual seller's full name otherwise.</summary>
         public string CompanyName { get; set; } = string.Empty;
+
+        /// <summary>True when this listing was created by an individual (non-company) seller.</summary>
+        public bool IsIndividualSeller { get; set; }
         public decimal CurrentHighestBid { get; set; }
         public int BidCount { get; set; }
         public ListingStatus Status { get; set; }

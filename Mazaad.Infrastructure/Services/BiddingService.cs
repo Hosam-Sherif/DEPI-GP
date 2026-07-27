@@ -44,9 +44,12 @@ namespace Mazaad.Infrastructure.Services
             if (listing == null)
                 return Fail("Listing not found.");
 
-            // ── Business Rule #2: شركة لا تستطيع المزايدة على مزادها الخاص ──────
+            // ── Business Rule #2: البائع (شركة أو فرد) لا يستطيع المزايدة على مزاده الخاص ──
             if (companyId.HasValue && listing.CompanyId == companyId.Value)
                 return Fail("A company cannot place a bid on its own auction listing.");
+
+            if (!companyId.HasValue && listing.SellerUserId.HasValue && listing.SellerUserId.Value == userId)
+                return Fail("You cannot place a bid on your own auction listing.");
 
             if (listing.IsDeleted || listing.Status == ListingStatus.Cancelled)
                 return Fail("This listing is no longer active.");
@@ -185,7 +188,7 @@ namespace Mazaad.Infrastructure.Services
         {
             var bids = await _context.Bids
                 .Include(b => b.BuyerCompany)
-                .Include(b => b.User)   
+                .Include(b => b.User)
                 .Where(b => b.ListingId == listingId)
                 .OrderByDescending(b => b.BidAmountPerUnit)
                 .ToListAsync();
@@ -194,7 +197,7 @@ namespace Mazaad.Infrastructure.Services
             {
                 Success = true,
                 Message = "Bid retrieved",
-                DisplayBiddersName = ResolveDisplayName(b),  
+                DisplayBiddersName = ResolveDisplayName(b),
                 NewPrice = b.BidAmountPerUnit
             });
         }
@@ -205,7 +208,7 @@ namespace Mazaad.Infrastructure.Services
         {
             var bids = await _context.Bids
                 .Include(b => b.BuyerCompany)
-                .Include(b => b.User)   
+                .Include(b => b.User)
                 .Where(b => b.ListingId == listingId && b.Status != BidStatus.Cancelled)
                 .OrderByDescending(b => b.BidAmountPerUnit)
                 .Take(10)
@@ -220,7 +223,7 @@ namespace Mazaad.Infrastructure.Services
         {
             var bid = await _context.Bids
                 .Include(b => b.BuyerCompany)
-                .Include(b => b.User)   
+                .Include(b => b.User)
                 .FirstOrDefaultAsync(b => b.Id == bidId);
 
             return bid == null ? null : MapToBidDetailDto(bid);
@@ -232,13 +235,13 @@ namespace Mazaad.Infrastructure.Services
         {
             var bids = await _context.Bids
                 .Include(b => b.BuyerCompany)
-                .Include(b => b.User)   
+                .Include(b => b.User)
                 .Include(b => b.Listing)
                 .Where(b => b.BuyerCompanyId == companyId)
                 .OrderByDescending(b => b.CreatedAt)
                 .ToListAsync();
 
-            return bids.Select(ApplyOutcomeStatus); 
+            return bids.Select(ApplyOutcomeStatus);
         }
 
         // ─── My Bids (by user — works for both company users and individual bidders) ── 
@@ -277,7 +280,7 @@ namespace Mazaad.Infrastructure.Services
 
         // ─── Delete / Cancel Bid ──────────────────────────────────────────────────
 
-        public async Task<bool> DeleteBidAsync(int bidId, int userId) 
+        public async Task<bool> DeleteBidAsync(int bidId, int userId)
         {
             var bid = await _context.Bids.FindAsync(bidId);
 
@@ -342,7 +345,7 @@ namespace Mazaad.Infrastructure.Services
             Id = b.Id,
             ListingId = b.ListingId,
             BuyerCompanyId = b.BuyerCompanyId,
-            DisplayBidderName = ResolveDisplayName(b),   
+            DisplayBidderName = ResolveDisplayName(b),
             BidAmountPerUnit = b.BidAmountPerUnit,
             TotalBidAmount = b.TotalBidAmount,
             Quantity = b.Quantity,

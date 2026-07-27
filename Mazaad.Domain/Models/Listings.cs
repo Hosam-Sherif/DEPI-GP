@@ -11,8 +11,13 @@ namespace Mazaad.Domain.Models
         [Key]
         public int Id { get; set; }
 
+        /// <summary>Null when the listing/auction was created by an individual (non-company) seller.</summary>
         [ForeignKey("Company")]
-        public int CompanyId { get; set; }
+        public int? CompanyId { get; set; }
+
+        /// <summary>Set only for listings created by an individual (non-company) seller. Null for company listings.</summary>
+        [ForeignKey("Seller")]
+        public int? SellerUserId { get; set; }
 
         [ForeignKey("Category")]
         public int CategoryId { get; set; }
@@ -76,7 +81,8 @@ namespace Mazaad.Domain.Models
         public DateTime UpdatedAt { get; set; }
 
         // Navigation
-        public Companies Company { get; set; } = null!;
+        public Companies? Company { get; set; }
+        public ApplicationUser? Seller { get; set; }
         public Material_Categories Category { get; set; } = null!;
         public ICollection<Bids> Bids { get; set; } = new HashSet<Bids>();
         public ICollection<Chat_Channels> Chat_Channels { get; set; } = new HashSet<Chat_Channels>();

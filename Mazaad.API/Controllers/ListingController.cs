@@ -36,10 +36,11 @@ namespace Mazaad.API.Controllers
         public async Task<IActionResult> GetMine([FromQuery] ListingFilterDto filter)
         {
             var companyId = GetCurrentCompanyId();
-            if (companyId == null)
-                return Unauthorized(new { error = "A valid company account is required." });
+            var userId = GetCurrentUserId();
+            if (companyId == null && userId == null)
+                return Unauthorized(new { error = "A valid account is required." });
 
-            var result = await _listingService.GetMyListingsAsync(companyId.Value, filter);
+            var result = await _listingService.GetMyListingsAsync(companyId, companyId == null ? userId : null, filter);
             return Ok(result);
         }
 
@@ -64,18 +65,20 @@ namespace Mazaad.API.Controllers
             return Ok(detail);
         }
 
-        /// <summary>Create a new listing. Requires CompanyAdmin or CompanyUser JWT token.</summary>
+        /// <summary>Create a new listing/auction. Works for company accounts (CompanyAdmin/CompanyUser)
+        /// and for individual users (Bidder role) creating their own auction.</summary>
         [HttpPost]
         [Authorize]
         public async Task<IActionResult> Create([FromBody] CreateListingDto request)
         {
             var companyId = GetCurrentCompanyId();
-            if (companyId == null)
-                return Unauthorized(new { error = "A valid company account is required to create listings." });
+            var userId = GetCurrentUserId();
+            if (companyId == null && userId == null)
+                return Unauthorized(new { error = "A valid account is required to create listings." });
 
             try
             {
-                var created = await _listingService.CreateListingAsync(companyId.Value, request);
+                var created = await _listingService.CreateListingAsync(companyId, companyId == null ? userId : null, request);
                 return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
             }
             catch (ArgumentException ex)
@@ -88,18 +91,19 @@ namespace Mazaad.API.Controllers
             }
         }
 
-        /// <summary>Update a listing's mutable fields. Only members of the owning company can update.</summary>
+        /// <summary>Update a listing's mutable fields. Only the owning company or individual seller can update.</summary>
         [HttpPut("{id}")]
         [Authorize]
         public async Task<IActionResult> Update(int id, [FromBody] CreateListingDto request)
         {
             var companyId = GetCurrentCompanyId();
-            if (companyId == null)
-                return Unauthorized(new { error = "A valid company account is required to update listings." });
+            var userId = GetCurrentUserId();
+            if (companyId == null && userId == null)
+                return Unauthorized(new { error = "A valid account is required to update listings." });
 
             try
             {
-                var updated = await _listingService.UpdateListingAsync(id, companyId.Value, request);
+                var updated = await _listingService.UpdateListingAsync(id, companyId, companyId == null ? userId : null, request);
                 if (updated == null) return NotFound(new { error = "Listing not found or you do not own it." });
                 return Ok(updated);
             }
@@ -119,17 +123,18 @@ namespace Mazaad.API.Controllers
 
         /// <summary>
         /// Cancel a listing — sets status to Cancelled without deleting data.
-        /// Only members of the owning company can cancel.
+        /// Only the owning company or individual seller can cancel.
         /// </summary>
         [HttpPatch("{id}/cancel")]
         [Authorize]
         public async Task<IActionResult> Cancel(int id)
         {
             var companyId = GetCurrentCompanyId();
-            if (companyId == null)
-                return Unauthorized(new { error = "A valid company account is required to cancel listings." });
+            var userId = GetCurrentUserId();
+            if (companyId == null && userId == null)
+                return Unauthorized(new { error = "A valid account is required to cancel listings." });
 
-            var success = await _listingService.CancelListingAsync(id, companyId.Value);
+            var success = await _listingService.CancelListingAsync(id, companyId, companyId == null ? userId : null);
             if (!success) return BadRequest(new { error = "Could not cancel listing. It may not exist, already be cancelled, or you don't own it." });
             return NoContent();
         }
@@ -137,7 +142,7 @@ namespace Mazaad.API.Controllers
         /// <summary>
         /// End an auction immediately — sets status to Ended and EndDate to now,
         /// and returns the winning bid (if any) so the caller can announce it.
-        /// Only members of the owning company can end it. Cannot end an already
+        /// Only the owning company or individual seller can end it. Cannot end an already
         /// Ended or Cancelled auction.
         /// </summary>
         [HttpPatch("{id}/end")]
@@ -145,24 +150,26 @@ namespace Mazaad.API.Controllers
         public async Task<IActionResult> EndNow(int id)
         {
             var companyId = GetCurrentCompanyId();
-            if (companyId == null)
-                return Unauthorized(new { error = "A valid company account is required to end auctions." });
+            var userId = GetCurrentUserId();
+            if (companyId == null && userId == null)
+                return Unauthorized(new { error = "A valid account is required to end auctions." });
 
-            var result = await _listingService.EndListingNowAsync(id, companyId.Value);
+            var result = await _listingService.EndListingNowAsync(id, companyId, companyId == null ? userId : null);
             if (result == null) return BadRequest(new { error = "Could not end auction. It may not exist, already be ended/cancelled, or you don't own it." });
             return Ok(result);
         }
 
-        /// <summary>Soft-delete a listing. Only members of the owning company can delete.</summary>
+        /// <summary>Soft-delete a listing. Only the owning company or individual seller can delete.</summary>
         [HttpDelete("{id}")]
         [Authorize]
         public async Task<IActionResult> Delete(int id)
         {
             var companyId = GetCurrentCompanyId();
-            if (companyId == null)
-                return Unauthorized(new { error = "A valid company account is required to delete listings." });
+            var userId = GetCurrentUserId();
+            if (companyId == null && userId == null)
+                return Unauthorized(new { error = "A valid account is required to delete listings." });
 
-            var success = await _listingService.DeleteListingAsync(id, companyId.Value);
+            var success = await _listingService.DeleteListingAsync(id, companyId, companyId == null ? userId : null);
             if (!success) return BadRequest(new { error = "Could not delete listing. It may not exist or you don't own it." });
             return NoContent();
         }
@@ -183,10 +190,11 @@ namespace Mazaad.API.Controllers
                 return BadRequest(new { error = "Image size must not exceed 5MB." });
 
             var companyId = GetCurrentCompanyId();
-            if (companyId == null)
-                return Unauthorized(new { error = "A valid company account is required." });
+            var userId = GetCurrentUserId();
+            if (companyId == null && userId == null)
+                return Unauthorized(new { error = "A valid account is required." });
 
-            var updatedListing = await _listingService.UploadListingImageAsync(id, companyId.Value, image);
+            var updatedListing = await _listingService.UploadListingImageAsync(id, companyId, companyId == null ? userId : null, image);
             if (updatedListing == null)
                 return NotFound(new { error = "Listing not found or you do not own it." });
 
