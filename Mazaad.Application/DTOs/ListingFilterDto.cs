@@ -11,6 +11,11 @@ namespace Mazaad.Application.DTOs
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }
 
+        /// <summary>Filter to a specific company's listings — used by the store page
+        /// (e.g. GET /api/Listing?companyId=5) so visitors can see and bid on a
+        /// company's own store auctions.</summary>
+        public int? CompanyId { get; set; }
+
         /// <summary>Free-text search on Title / Description</summary>
         public string? SearchTerm { get; set; }
 

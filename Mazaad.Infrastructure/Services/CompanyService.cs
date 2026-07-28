@@ -36,8 +36,8 @@ namespace Mazaad.Infrastructure.Services
             var companyIds = companies.Select(c => c.Id).ToList();
 
             var activeCountsMap = await _context.Listings
-                .Where(l => companyIds.Contains(l.CompanyId) && l.Status == ListingStatus.Active)
-                .GroupBy(l => l.CompanyId)
+                .Where(l => l.CompanyId.HasValue && companyIds.Contains(l.CompanyId.Value) && l.Status == ListingStatus.Active)
+                .GroupBy(l => l.CompanyId!.Value)
                 .Select(g => new { CompanyId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.CompanyId, x => x.Count);
 
