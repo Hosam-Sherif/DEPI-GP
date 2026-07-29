@@ -6,7 +6,8 @@ namespace Mazaad.Application.DTOs
     public class ListingResponseDto
     {
         public int Id { get; set; }
-        public int CompanyId { get; set; }
+        public int? CompanyId { get; set; }
+        public int? SellerUserId { get; set; }
         public int CategoryId { get; set; }
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;

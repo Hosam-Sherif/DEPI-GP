@@ -7,8 +7,13 @@ namespace Mazaad.Application.DTOs
     public class ListingDetailDto
     {
         public int Id { get; set; }
-        public int CompanyId { get; set; }
+        public int? CompanyId { get; set; }
+
+        /// <summary>Company name for company listings, or the individual seller's full name otherwise.</summary>
         public string CompanyName { get; set; } = string.Empty;
+
+        /// <summary>True when this listing was created by an individual (non-company) seller.</summary>
+        public bool IsIndividualSeller { get; set; }
         public int CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
         public string Title { get; set; } = string.Empty;
