@@ -85,8 +85,8 @@ namespace Mazaad.Infrastructure.Services.Auth
 
         // ── Login ─────────────────────────────────────────────────────────────
         public async Task<Result<AuthResponseDto>> LoginAsync(
-            LoginDto dto,
-            string ipAddress)
+      LoginDto dto,
+      string ipAddress)
         {
             var user = await _userManager.FindByEmailAsync(dto.Email);
 
@@ -102,6 +102,7 @@ namespace Mazaad.Infrastructure.Services.Auth
                 return Result<AuthResponseDto>.Failure("Invalid email or password.");
             }
 
+            // ── Check Password أولاً قبل أي حاجة تانية ─────────────────────────
             var signInResult = await _signInManager.CheckPasswordSignInAsync(
                 user, dto.Password, lockoutOnFailure: true);
 
@@ -109,41 +110,59 @@ namespace Mazaad.Infrastructure.Services.Auth
             {
                 await _securityLog.LogAsync(
                     SecurityEventType.AccountLockedOut,
-                    success: false,
-                    ipAddress: ipAddress,
-                    userId: user.Id,
-                    email: user.Email,
+                    success: false, ipAddress: ipAddress, userId: user.Id, email: user.Email,
                     details: "Account locked out due to multiple failed attempts");
 
-                return Result<AuthResponseDto>.Failure(
-                    "Account locked. Try again later.");
+                return Result<AuthResponseDto>.Failure("Account locked. Try again later.");
             }
 
-            if (signInResult.RequiresTwoFactor)
-                return Result<AuthResponseDto>.Failure("2FA_REQUIRED");
-
-            if (!signInResult.Succeeded)
+            if (!signInResult.Succeeded && !signInResult.RequiresTwoFactor)
             {
                 await _securityLog.LogAsync(
                     SecurityEventType.LoginFailed,
-                    success: false,
-                    ipAddress: ipAddress,
-                    userId: user.Id,
-                    email: user.Email,
+                    success: false, ipAddress: ipAddress, userId: user.Id, email: user.Email,
                     details: "Invalid password");
 
                 return Result<AuthResponseDto>.Failure("Invalid email or password.");
             }
+
+            // ── 🔒 CompanyVerificationStatus Gate ───────────────────────────────
+            // لو الـ user تابع لشركة (يعني مش SuperAdmin) لازم الشركة تكون Verified.
+            if (user.CompanyId.HasValue)
+            {
+                var company = await _context.Companies.FindAsync(user.CompanyId.Value);
+
+                if (company == null || company.VerificationStatus != CompanyVerificationStatus.Verified)
+                {
+                    var reason = company?.VerificationStatus switch
+                    {
+                        CompanyVerificationStatus.Pending =>
+                            "Your company registration is still pending SuperAdmin approval.",
+                        CompanyVerificationStatus.Rejected =>
+                            $"Your company registration was rejected. Reason: {company.RejectionReason}",
+                        CompanyVerificationStatus.Suspended =>
+                            $"Your company account is suspended. Reason: {company.RejectionReason}",
+                        _ => "Your company account is not active."
+                    };
+
+                    await _securityLog.LogAsync(
+                        SecurityEventType.LoginFailed,
+                        success: false, ipAddress: ipAddress, userId: user.Id, email: user.Email,
+                        details: $"Blocked — Company status: {company?.VerificationStatus}");
+
+                    return Result<AuthResponseDto>.Failure(reason);
+                }
+            }
+
+            if (signInResult.RequiresTwoFactor)
+                return Result<AuthResponseDto>.Failure("2FA_REQUIRED");
 
             user.LastLoginDate = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
 
             await _securityLog.LogAsync(
                 SecurityEventType.LoginSuccess,
-                success: true,
-                ipAddress: ipAddress,
-                userId: user.Id,
-                email: user.Email);
+                success: true, ipAddress: ipAddress, userId: user.Id, email: user.Email);
 
             return await BuildAuthResponseAsync(user, ipAddress, dto.RememberMe);
         }
@@ -246,8 +265,7 @@ namespace Mazaad.Infrastructure.Services.Auth
 
         // ── Refresh Token ─────────────────────────────────────────────────────
         public async Task<Result<AuthResponseDto>> RefreshTokenAsync(
-            string refreshToken,
-            string ipAddress)
+       string refreshToken, string ipAddress)
         {
             var storedToken = await _context.RefreshTokens
                 .Include(r => r.User)
@@ -258,18 +276,7 @@ namespace Mazaad.Infrastructure.Services.Auth
 
             if (storedToken.IsRevoked)
             {
-                await RevokeAllUserTokensAsync(
-                    storedToken.UserId,
-                    "Reuse detected — possible token theft",
-                    ipAddress);
-
-                await _securityLog.LogAsync(
-                    SecurityEventType.TokenRevoked,
-                    success: false,
-                    ipAddress: ipAddress,
-                    userId: storedToken.UserId,
-                    details: "Refresh token reuse detected");
-
+                await RevokeAllUserTokensAsync(storedToken.UserId, "Reuse detected — possible token theft", ipAddress);
                 return Result<AuthResponseDto>.Failure("Token reuse detected. Please login again.");
             }
 
@@ -278,16 +285,24 @@ namespace Mazaad.Infrastructure.Services.Auth
 
             var user = storedToken.User;
 
+            // 🔒 نفس الـ Gate
+            if (user.CompanyId.HasValue)
+            {
+                var company = await _context.Companies.FindAsync(user.CompanyId.Value);
+                if (company == null || company.VerificationStatus != CompanyVerificationStatus.Verified)
+                {
+                    await RevokeAllUserTokensAsync(user.Id, "Company no longer verified", ipAddress);
+                    return Result<AuthResponseDto>.Failure("Your company account is not active.");
+                }
+            }
+
             storedToken.IsRevoked = true;
             storedToken.RevokedByIp = ipAddress;
             storedToken.RevokedReason = "Rotated";
 
             await _securityLog.LogAsync(
                 SecurityEventType.TokenRefreshed,
-                success: true,
-                ipAddress: ipAddress,
-                userId: user.Id,
-                email: user.Email);
+                success: true, ipAddress: ipAddress, userId: user.Id, email: user.Email);
 
             return await BuildAuthResponseAsync(user, ipAddress);
         }

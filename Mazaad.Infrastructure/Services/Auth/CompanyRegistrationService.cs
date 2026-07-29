@@ -29,25 +29,25 @@ namespace Mazaad.Infrastructure.Services.Auth
         {
             _context = context;
             _userManager = userManager;
-            _jwtService = jwtService;
+            //_jwtService = jwtService;
             _securityLog = securityLog;
             _documentService = documentService;
         }
 
         // ── Register Company + First Admin ────────────────────────────────────
-        public async Task<Result<AuthResponseDto>> RegisterCompanyAsync(
+        public async Task<Result<CompanyRegistrationResultDto>> RegisterCompanyAsync(
             RegisterCompanyDto dto,
             string ipAddress)
         {
             // تأكد إن الـ email مش موجود
             var existingUser = await _userManager.FindByEmailAsync(dto.AdminEmail);
             if (existingUser != null)
-                return Result<AuthResponseDto>.Failure("Email already registered.");
+                return Result<CompanyRegistrationResultDto>.Failure("Email already registered.");
 
             // تأكد إن الـ industry موجود
             var industry = await _context.IndustryTypes.FindAsync(dto.IndustryId);
             if (industry == null)
-                return Result<AuthResponseDto>.Failure("Invalid industry.");
+                return Result<CompanyRegistrationResultDto>.Failure("Invalid industry.");
 
             // كل العملية في transaction واحدة
             // إما Company + User + Documents كلهم اتعملوا أو ولا حاجة
@@ -89,86 +89,65 @@ namespace Mazaad.Infrastructure.Services.Auth
                 if (!createResult.Succeeded)
                 {
                     await transaction.RollbackAsync();
-                    return Result<AuthResponseDto>.Failure(
+                    return Result<CompanyRegistrationResultDto>.Failure(
                         createResult.Errors.Select(e => e.Description));
                 }
 
                 await _userManager.AddToRoleAsync(admin, "CompanyAdmin");
 
-                // 3. رفع المستندات
+                // داخل RegisterCompanyAsync، بدّل الجزء الأخير من try block بالكامل:
+
+                // 3. رفع المستندات (زي ما هو)
                 var commercialDoc = await _documentService.UploadAsync(
-                    company.Id,
-                    admin.Id,
-                    dto.CommercialRegisterDocument,
-                    CompanyDocumentType.CommercialRegister);
+                    company.Id, admin.Id, dto.CommercialRegisterDocument, CompanyDocumentType.CommercialRegister);
 
                 if (!commercialDoc.Succeeded)
                 {
                     await transaction.RollbackAsync();
-                    return Result<AuthResponseDto>.Failure(commercialDoc.Error!);
+                    return Result<CompanyRegistrationResultDto>.Failure(commercialDoc.Error!);
                 }
 
                 var taxDoc = await _documentService.UploadAsync(
-                    company.Id,
-                    admin.Id,
-                    dto.TaxCardDocument,
-                    CompanyDocumentType.TaxCard);
+                    company.Id, admin.Id, dto.TaxCardDocument, CompanyDocumentType.TaxCard);
 
                 if (!taxDoc.Succeeded)
                 {
                     await transaction.RollbackAsync();
-                    return Result<AuthResponseDto>.Failure(taxDoc.Error!);
+                    return Result<CompanyRegistrationResultDto>.Failure(taxDoc.Error!);
                 }
 
-                // المستندات الإضافية اختيارية
                 if (dto.AdditionalDocuments != null)
                 {
                     foreach (var doc in dto.AdditionalDocuments)
                     {
-                        await _documentService.UploadAsync(
-                            company.Id,
-                            admin.Id,
-                            doc,
-                            CompanyDocumentType.Other);
+                        await _documentService.UploadAsync(company.Id, admin.Id, doc, CompanyDocumentType.Other);
                     }
                 }
 
                 await transaction.CommitAsync();
 
-                // Log the events
                 await _securityLog.LogAsync(
                     SecurityEventType.CompanyRegistered,
                     success: true,
                     ipAddress: ipAddress,
                     userId: admin.Id,
                     email: admin.Email,
-                    details: $"Company: {company.CompanyName}");
+                    details: $"Company: {company.CompanyName} | Status: Pending");
 
-                // نرجع auth response عشان الـ user يبدأ يستخدم الـ app
-                // لكن الـ company لسه Pending
-                var roles = await _userManager.GetRolesAsync(admin);
-                var accessToken = await _jwtService.GenerateAccessTokenAsync(admin, roles);
-
-                return Result<AuthResponseDto>.Success(new AuthResponseDto
+                // ⚠️ مفيش أي JWT هنا خالص. الشركة Pending ومينفعش حد يستخدم التوكن بتاعها.
+                return Result<CompanyRegistrationResultDto>.Success(new CompanyRegistrationResultDto
                 {
-                    AccessToken = accessToken,
-                    AccessTokenExpiry = DateTime.UtcNow.AddMinutes(10080),
-                    User = new UserInfoDto
-                    {
-                        Id = admin.Id,
-                        FullName = admin.FullName,
-                        Email = admin.Email!,
-                        JobTitle = admin.JobTitle,
-                        CompanyId = company.Id,
-                        CompanyName = company.CompanyName,
-                        Roles = roles
-                    }
+                    CompanyId = company.Id,
+                    CompanyName = company.CompanyName,
+                    AdminUserId = admin.Id,
+                    AdminEmail = admin.Email!,
+                    Status = "PendingVerification"
                 });
             }
             catch (Exception ex)
             {
                 await transaction.RollbackAsync();
-                return Result<AuthResponseDto>.Failure($"Registration failed: {ex.Message}");
+                return Result<CompanyRegistrationResultDto>.Failure($"Registration failed: {ex.Message}");
             }
         }
 

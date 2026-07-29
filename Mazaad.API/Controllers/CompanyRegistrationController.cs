@@ -29,18 +29,16 @@ namespace Mazaad.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> Register([FromForm] RegisterCompanyDto dto)
         {
-            var result = await _registrationService.RegisterCompanyAsync(
-                dto, GetIpAddress());
+            var result = await _registrationService.RegisterCompanyAsync(dto, GetIpAddress());
 
             if (!result.Succeeded)
                 return BadRequest(new { errors = result.Errors });
 
             return StatusCode(201, new
             {
-                message = "Company registered successfully. Pending admin verification.",
-                accessToken = result.Data!.AccessToken,
-                accessTokenExpiry = result.Data.AccessTokenExpiry,
-                user = result.Data.User
+                message = "Company registered successfully. Your account will be activated once a SuperAdmin verifies your company documents. Please try logging in after verification.",
+                companyId = result.Data!.CompanyId,
+                status = result.Data.Status
             });
         }
 
