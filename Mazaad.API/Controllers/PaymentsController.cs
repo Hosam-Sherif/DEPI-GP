@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Mazaad.Application.DTOs;
 using Mazaad.Application.Interfaces.Services;
@@ -71,5 +71,29 @@ namespace Mazaad.API.Controllers
             // Always 200 so Paymob doesn't keep retrying; rejection is logged internally via 'accepted'.
             return Ok(new { received = accepted });
         }
+
+        /// <summary>
+        /// Initiates a buyer refund for an order that is under escrow custody (Held status).
+        /// SuperAdmin only.
+        /// </summary>
+        [HttpPost("order/{orderId}/refund")]
+        [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> Refund(int orderId, [FromQuery] string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                return BadRequest(new { message = "Refund reason is required." });
+
+            try
+            {
+                var success = await _paymentService.InitiateRefundAsync(orderId, reason);
+                return success 
+                    ? Ok(new { message = "Refund processed successfully." })
+                    : BadRequest(new { message = "Refund request rejected by Paymob API." });
+            }
+            catch (System.InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
     }
-}
+}

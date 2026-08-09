@@ -45,6 +45,12 @@ namespace Mazaad.Infrastructure.Persistence
         // ── Store ──────────────────────────────────────────────────────────────────
         public DbSet<Store> Stores { get; set; }
 
+        // ── Escrow & Payout Module ────────────────────────────────────────────
+        public DbSet<EscrowRecord> EscrowRecords { get; set; }
+        public DbSet<PayoutRecord> PayoutRecords { get; set; }
+        public DbSet<SellerBankAccount> SellerBankAccounts { get; set; }
+
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -315,6 +321,73 @@ namespace Mazaad.Infrastructure.Persistence
                 b.Property(bid => bid.Quantity).HasPrecision(18, 4);
                 b.Property(bid => bid.TotalBidAmount).HasPrecision(18, 4);
             });
+
+            // ── Escrow & Payout Module Configurations ─────────────────────────
+            modelBuilder.Entity<EscrowRecord>(b =>
+            {
+                b.HasOne(e => e.Order)
+                 .WithOne(o => o.Escrow)
+                 .HasForeignKey<EscrowRecord>(e => e.OrderId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasOne(e => e.SourcePayment)
+                 .WithMany()
+                 .HasForeignKey(e => e.SourcePaymentId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.Property(e => e.AmountHeld).HasPrecision(18, 4);
+                b.Property(e => e.PlatformFee).HasPrecision(18, 4);
+                b.Property(e => e.SellerDueAmount).HasPrecision(18, 4);
+            });
+
+            modelBuilder.Entity<PayoutRecord>(b =>
+            {
+                b.HasOne(p => p.EscrowRecord)
+                 .WithMany(e => e.Payouts)
+                 .HasForeignKey(p => p.EscrowRecordId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasOne(p => p.SellerCompany)
+                 .WithMany()
+                 .HasForeignKey(p => p.SellerCompanyId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasOne(p => p.DestinationAccount)
+                 .WithMany(a => a.Payouts)
+                 .HasForeignKey(p => p.SellerBankAccountId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.Property(p => p.Amount).HasPrecision(18, 4);
+            });
+
+            modelBuilder.Entity<SellerBankAccount>(b =>
+            {
+                b.HasOne(a => a.Company)
+                 .WithMany()
+                 .HasForeignKey(a => a.CompanyId)
+                 .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasOne(a => a.VerifiedBy)
+                 .WithMany()
+                 .HasForeignKey(a => a.VerifiedByUserId)
+                 .OnDelete(DeleteBehavior.NoAction)
+                 .IsRequired(false);
+
+                // Enforce at most one default account per company (excluding deleted ones)
+                b.HasIndex(a => a.CompanyId)
+                 .HasFilter("[IsDefault] = 1 AND [IsDeleted] = 0")
+                 .IsUnique();
+            });
+
+            modelBuilder.Entity<Payments>(b =>
+            {
+                b.HasOne(p => p.Escrow)
+                 .WithMany()
+                 .HasForeignKey(p => p.EscrowRecordId)
+                 .OnDelete(DeleteBehavior.NoAction)
+                 .IsRequired(false);
+            });
+
 
             // NoAction على كل الـ relationships الباقية
             foreach (var relationship in modelBuilder.Model.GetEntityTypes()

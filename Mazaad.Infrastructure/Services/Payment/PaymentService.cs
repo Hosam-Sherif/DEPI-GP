@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -20,18 +20,22 @@ namespace Mazaad.Infrastructure.Services.Payment
         private readonly PaymobClient _paymob;
         private readonly PaymobOptions _options;
         private readonly INotificationService _notificationService;
+        private readonly IEscrowService _escrowService;
 
         public PaymentService(
             AppDbContext context,
             PaymobClient paymob,
             IOptions<PaymobOptions> options,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IEscrowService escrowService)
         {
             _context = context;
             _paymob = paymob;
             _options = options.Value;
             _notificationService = notificationService;
+            _escrowService = escrowService;
         }
+
 
         // ─── Initiate ─────────────────────────────────────────────────────────
 
@@ -172,27 +176,48 @@ namespace Mazaad.Infrastructure.Services.Payment
             if (!int.TryParse(merchantOrderId, out var orderId))
                 return false;
 
-            var payment = await _context.Payments
-                .Where(p => p.OrderId == orderId)
-                .OrderByDescending(p => p.CreatedAt)
-                .FirstOrDefaultAsync();
+            using var transaction = await _context.Database.BeginTransactionAsync();
 
-            if (payment == null) return false;
-
-            payment.ProviderTransactionId = transactionId;
-            payment.TransactionReference = transactionId;
-
-            if (success)
+            try
             {
-                payment.Status = PaymentStatus.Paid;
-                payment.PaidAt = DateTime.UtcNow;
+                var payment = await _context.Payments
+                    .Where(p => p.OrderId == orderId)
+                    .OrderByDescending(p => p.CreatedAt)
+                    .FirstOrDefaultAsync();
 
-                var order = await _context.Orders.FindAsync(orderId);
-                if (order != null)
+                if (payment == null) return false;
+
+                payment.ProviderTransactionId = transactionId;
+                payment.TransactionReference = transactionId;
+
+                Orders? order = null;
+
+                if (success)
                 {
-                    order.Status = OrderStatus.Completed;
-                    order.UpdatedAt = DateTime.UtcNow;
+                    payment.Status = PaymentStatus.Paid;
+                    payment.PaidAt = DateTime.UtcNow;
 
+                    order = await _context.Orders.FindAsync(orderId);
+                    if (order != null)
+                    {
+                        // Escrow flow: order moves to Processing (not Completed yet)
+                        order.Status = OrderStatus.Processing;
+                        order.UpdatedAt = DateTime.UtcNow;
+                    }
+                }
+                else
+                {
+                    payment.Status = PaymentStatus.Failed;
+                }
+
+                await _context.SaveChangesAsync();
+
+                if (success && order != null)
+                {
+                    // Create the EscrowRecord under platform custody
+                    await _escrowService.CreateEscrowAsync(order.Id, payment.Id);
+
+                    // Send notification to seller
                     var sellerUser = await _context.Users
                         .FirstOrDefaultAsync(u => u.CompanyId == order.SellerCompanyId);
 
@@ -201,20 +226,73 @@ namespace Mazaad.Infrastructure.Services.Payment
                         await _notificationService.CreateNotificationAsync(
                             sellerUser.Id,
                             "Payment received",
-                            $"Order #{order.Id} has been paid successfully via {payment.PaymentMethod}.",
+                            $"Order #{order.Id} has been paid successfully via {payment.PaymentMethod}. Funds are held in escrow.",
                             "Order",
                             order.Id);
                     }
                 }
-            }
-            else
-            {
-                payment.Status = PaymentStatus.Failed;
-            }
 
-            await _context.SaveChangesAsync();
-            return true;
+                await transaction.CommitAsync();
+                return true;
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync();
+                return false;
+            }
         }
+
+        // ─── Refund ───────────────────────────────────────────────────────────
+
+        public async Task<bool> InitiateRefundAsync(int orderId, string reason)
+        {
+            var payment = await _context.Payments
+                .Where(p => p.OrderId == orderId && p.Status == PaymentStatus.Paid)
+                .OrderByDescending(p => p.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (payment == null || string.IsNullOrEmpty(payment.ProviderTransactionId))
+                throw new InvalidOperationException($"No completed payment record found to refund for Order #{orderId}.");
+
+            try
+            {
+                var authToken = await _paymob.AuthenticateAsync();
+                var amountCents = (long)Math.Round(payment.Amount * 100, MidpointRounding.AwayFromZero);
+
+                var success = await _paymob.RefundTransactionAsync(
+                    authToken, 
+                    payment.ProviderTransactionId, 
+                    amountCents);
+
+                if (success)
+                {
+                    payment.Status = PaymentStatus.Refunded;
+                    await _context.SaveChangesAsync();
+
+                    // Send notification to buyer
+                    var buyerUser = await _context.Users
+                        .FirstOrDefaultAsync(u => u.CompanyId == payment.Order.BuyerCompanyId);
+
+                    if (buyerUser != null)
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            buyerUser.Id,
+                            "Refund Processed",
+                            $"Payment of {payment.Amount} {payment.Currency} for Order #{orderId} has been refunded to your account.",
+                            "Order",
+                            orderId);
+                    }
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
 
         // ─── Helpers ──────────────────────────────────────────────────────────
 

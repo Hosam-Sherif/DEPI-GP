@@ -24,6 +24,9 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
 using System.Threading.RateLimiting;
+using Mazaad.Infrastructure.Services.Escrow;
+using Mazaad.Infrastructure.Services.Payout;
+
 
 namespace Mazaad.API
 {
@@ -229,6 +232,22 @@ namespace Mazaad.API
             });
 
             builder.Services.AddScoped<IPaymentService, PaymentService>();
+
+            // ─── Escrow & Payout Module ───────────────────────────────────────
+            builder.Services.AddScoped<IEscrowService, EscrowService>();
+            builder.Services.AddScoped<IPayoutService, PayoutService>();
+            builder.Services.AddScoped<ISellerBankAccountService, SellerBankAccountService>();
+
+            builder.Services.Configure<PaymobDisbursementOptions>(
+                builder.Configuration.GetSection("PaymobDisbursement"));
+
+            builder.Services.AddHttpClient<PaymobDisbursementClient>(client =>
+            {
+                client.BaseAddress = new Uri(
+                    builder.Configuration["PaymobDisbursement:BaseUrl"] ?? "https://accept.paymob.com");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+
 
             // ─── Commission ───────────────────────────────────────────────────
             builder.Services.AddScoped<ICommissionPolicyService, CommissionPolicyService>();

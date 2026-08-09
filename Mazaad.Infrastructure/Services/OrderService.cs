@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Application.Interfaces;
 using Mazaad.Application.DTOs;
+using Mazaad.Application.DTOs.Escrow;
 using Mazaad.Application.Interfaces.Services;
 using Mazaad.Domain.Enums;
 using Mazaad.Domain.Models;
@@ -15,12 +17,21 @@ namespace Mazaad.Infrastructure.Services
     {
         private readonly AppDbContext _context;
         private readonly INotificationService _notificationService;
+        private readonly IEscrowService _escrowService;
+        private readonly ITelegramService _telegramService;
 
-        public OrderService(AppDbContext context, INotificationService notificationService)
+        public OrderService(
+            AppDbContext context,
+            INotificationService notificationService,
+            IEscrowService escrowService,
+            ITelegramService telegramService)
         {
             _context = context;
             _notificationService = notificationService;
+            _escrowService = escrowService;
+            _telegramService = telegramService;
         }
+
 
         // ─── List Orders ──────────────────────────────────────────────────────────
 
@@ -30,6 +41,7 @@ namespace Mazaad.Infrastructure.Services
                 .Include(o => o.SellerCompany)
                 .Include(o => o.BuyerCompany)
                 .Include(o => o.Bid)
+                .Include(o => o.Escrow)
                 .Where(o => o.SellerCompanyId == companyId || o.BuyerCompanyId == companyId)
                 .OrderByDescending(o => o.OrderDate)
                 .ToListAsync();
@@ -45,7 +57,9 @@ namespace Mazaad.Infrastructure.Services
                 .Include(o => o.SellerCompany)
                 .Include(o => o.BuyerCompany)
                 .Include(o => o.Bid)
+                .Include(o => o.Escrow)
                 .FirstOrDefaultAsync(o => o.Id == orderId);
+
 
             return order == null ? null : MapToDto(order);
         }
@@ -123,15 +137,58 @@ namespace Mazaad.Infrastructure.Services
 
         public async Task<bool> UpdateOrderStatusAsync(int orderId, int companyId, OrderStatus newStatus)
         {
-            var order = await _context.Orders.FindAsync(orderId);
+            var order = await _context.Orders
+                .Include(o => o.SellerCompany)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
 
             if (order == null) return false;
             if (order.SellerCompanyId != companyId && order.BuyerCompanyId != companyId) return false;
+
+            if (order.Status == OrderStatus.Completed && newStatus != OrderStatus.Completed)
+                throw new InvalidOperationException("Cannot change status of a completed order.");
 
             order.Status = newStatus;
             order.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Escrow side-effects based on new status
+            if (newStatus == OrderStatus.Delivered)
+            {
+                try
+                {
+                    // Automatic disbursement of held funds to the seller
+                    await _escrowService.ReleaseEscrowAsync(order.Id);
+                }
+                catch (Exception ex)
+                {
+                    // Send alert but keep the order status as Delivered (physical delivery holds)
+                    await _telegramService.SendReportAsync(
+                        $"🚨 [Escrow Payout Initiation Failed]\nDelivery confirmed for Order #{order.Id}, but automated seller payout could not be initiated.\nError: {ex.Message}\nSeller Company: {order.SellerCompany.CompanyName}",
+                        null!);
+                }
+            }
+            else if (newStatus == OrderStatus.Cancelled)
+            {
+                var escrow = await _context.EscrowRecords
+                    .FirstOrDefaultAsync(e => e.OrderId == order.Id);
+
+                if (escrow != null && escrow.Status == EscrowStatus.Held)
+                {
+                    try
+                    {
+                        // Automatic refund to the buyer
+                        await _escrowService.RefundEscrowAsync(order.Id, "Order cancelled by participant.");
+                    }
+                    catch (Exception ex)
+                    {
+                        await _telegramService.SendReportAsync(
+                            $"🚨 [Escrow Refund Failed]\nOrder #{order.Id} was cancelled, but buyer refund failed.\nError: {ex.Message}",
+                            null!);
+                    }
+                }
+            }
+
             return true;
         }
 
@@ -151,7 +208,16 @@ namespace Mazaad.Infrastructure.Services
             TotalAmount = o.TotalAmount,
             Status = o.Status,
             Notes = o.Notes,
-            OrderDate = o.OrderDate
+            OrderDate = o.OrderDate,
+            Escrow = o.Escrow == null ? null : new EscrowStatusSummaryDto
+            {
+                Status = o.Escrow.Status,
+                HeldAt = o.Escrow.HeldAt,
+                ReleasedAt = o.Escrow.ReleasedAt,
+                SellerDueAmount = o.Escrow.SellerDueAmount,
+                Currency = o.Escrow.Currency
+            }
         };
     }
+
 }

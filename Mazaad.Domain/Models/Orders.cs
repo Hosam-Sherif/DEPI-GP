@@ -36,11 +36,18 @@ namespace Mazaad.Domain.Models
         public DateTime OrderDate { get; set; }
         public DateTime UpdatedAt { get; set; }
 
-        // Navigation
+        // ── Navigation ────────────────────────────────────────────────────
         public Companies SellerCompany { get; set; } = null!;
         public Companies BuyerCompany { get; set; } = null!;
         public Bids Bid { get; set; } = null!;
         public Commission_Policies AppliedPolicy { get; set; } = null!;
         public ICollection<Payments> Payments { get; set; } = new HashSet<Payments>();
+
+        /// <summary>
+        /// The escrow hold associated with this order.
+        /// Null until a buyer payment is successfully confirmed by Paymob.
+        /// One-to-one: FK lives on EscrowRecord.OrderId (configured in AppDbContext).
+        /// </summary>
+        public EscrowRecord? Escrow { get; set; }
     }
 }

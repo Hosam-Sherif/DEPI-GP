@@ -1,4 +1,4 @@
-﻿using System.Net.Http;
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -129,6 +129,18 @@ namespace Mazaad.Infrastructure.Services.Payment
 
         public string BuildIframeUrl(string paymentToken)
             => $"{_options.BaseUrl}/api/acceptance/iframes/{_options.IframeId}?payment_token={paymentToken}";
+
+        public async Task<bool> RefundTransactionAsync(string authToken, string transactionId, long amountCents)
+        {
+            var response = await _http.PostAsJsonAsync("/api/acceptance/void_refund/refund", new
+            {
+                auth_token = authToken,
+                transaction_id = long.Parse(transactionId),
+                amount_cents = amountCents
+            });
+
+            return response.IsSuccessStatusCode;
+        }
 
         private string GetWalletIntegrationId(PaymentMethodType method) => method switch
         {

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using Mazaad.Domain.Enums;
+
 
 namespace Mazaad.Domain.Models
 {
@@ -35,6 +37,24 @@ namespace Mazaad.Domain.Models
         public DateTime? PaidAt { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        // ── Escrow Link ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The EscrowRecord that was created when this payment was confirmed.
+        /// Null if the payment failed or the escrow has not yet been created.
+        ///
+        /// This FK creates the direct audit chain:
+        ///   Payments (buyer inbound) → EscrowRecord (platform custody) → PayoutRecord (seller outbound).
+        ///
+        /// Configured with DeleteBehavior.NoAction in AppDbContext: deleting a payment
+        /// must NOT cascade-delete the EscrowRecord or any associated PayoutRecords.
+        /// </summary>
+        [ForeignKey(nameof(Escrow))]
+        public int? EscrowRecordId { get; set; }
+
         public Orders Order { get; set; } = null!;
+
+        /// <summary>The escrow hold created when this payment was confirmed. Null until payment succeeds.</summary>
+        public EscrowRecord? Escrow { get; set; }
     }
 }
